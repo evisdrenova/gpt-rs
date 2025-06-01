@@ -4,6 +4,8 @@ use tokenizer::{SimpleTokenizer, create_vocab};
 mod file_operations;
 mod tokenizer;
 
+use tiktoken_rs::r50k_base;
+
 fn main() {
     let file_name = "the-verdict.txt";
 
@@ -24,4 +26,16 @@ fn main() {
 
     let decoded = tokenizer.decode(&ids);
     println!("Decoded: {}", decoded);
+
+    // this is gpt-2 tokenizer
+    let bpe = r50k_base().unwrap();
+
+    let new_text = "Akwirw ier";
+
+    let tokens = bpe.encode_with_special_tokens(new_text);
+
+    println!("Tokens: {:?}", tokens);
+
+    let detokenize = bpe.decode(tokens);
+    println!("detokenize : {:?}", detokenize);
 }

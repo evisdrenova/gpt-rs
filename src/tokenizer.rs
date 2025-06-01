@@ -1,6 +1,11 @@
 use indexmap::IndexMap;
+use once_cell::sync::Lazy;
 use regex::Regex;
 use std::collections::HashSet;
+
+static TOKENIZER_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r#"([,.:;?_!"()']|--|\s)"#).unwrap());
+
+static PUNCTUATION_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r#"\s+([,.?!\"()'])"#).unwrap());
 
 pub struct SimpleTokenizer<'a> {
     str_to_int: IndexMap<&'a str, usize>,
@@ -21,12 +26,10 @@ impl<'a> SimpleTokenizer<'a> {
     }
 
     pub fn encode(&self, text: &str) -> Vec<usize> {
-        let re = Regex::new(r#"([,.:;?_!"()']|--|\s)"#).unwrap();
-
         let mut tokens = Vec::new();
         let mut last_end = 0;
 
-        for mat in re.find_iter(text) {
+        for mat in TOKENIZER_REGEX.find_iter(text) {
             // Add token before delimiter
             if mat.start() > last_end {
                 let token = text[last_end..mat.start()].trim();
@@ -72,22 +75,18 @@ impl<'a> SimpleTokenizer<'a> {
 
         let mut result = text.join(" ");
 
-        let re = Regex::new(r#"\s+([,.?!\"()'])"#).unwrap();
-
         // Fix spacing around punctuation
-        result = re.replace_all(&result, "$1").to_string();
+        result = PUNCTUATION_REGEX.replace_all(&result, "$1").to_string();
 
         result
     }
 }
 
 pub fn create_vocab(raw_text: &str) -> IndexMap<&str, usize> {
-    let re = Regex::new(r#"([,.:;?_!"()']|--|\s)"#).unwrap();
-
     let mut unique_tokens: HashSet<&str> = HashSet::new();
     let mut last_end = 0;
 
-    for mat in re.find_iter(raw_text) {
+    for mat in TOKENIZER_REGEX.find_iter(raw_text) {
         if mat.start() > last_end {
             let token = raw_text[last_end..mat.start()].trim();
             if !token.is_empty() {

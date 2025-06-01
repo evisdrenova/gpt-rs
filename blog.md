@@ -211,3 +211,31 @@ Let's update our `encode` function to to replace unknown words with `<|unk|>`:
             })
             .collect()
 ```
+
+## Byte Pair Encoding
+
+Byte Pair Encoding (BPE) is the underlying tokenization scheme used by GPT2 and GPT-3. It's a little different than our tokenization scheme but honestly not all that different. It mainly handles unknown words in a much nicer way. If it encounters an unknown word, it breaks it down into sub-words or even letters until we can match it against our vocabulary.
+
+The actual vocabulary that GPT2/3 use is about 50,257 tokens long. For example, the unknown word: "Akwirw ier" will get encoded as: [33901, 86, 343, 86, 220, 959]. And then when we decode it, we get "Akwirw ier" back again. This is nice because then it doesn't have to replace unknown words with `<|unk|>`.
+
+The [BPE](https://github.com/openai/tiktoken) that OpenAI used is actually written in Rust but interfaces through Python. Luckily someone had already written a [Rust port](https://github.com/zurawiki/tiktoken-rs?tab=readme-ov-file), so to save ourselves some time, I just picked that one up.
+
+This is how we can use it:
+
+```rust
+
+    use tiktoken_rs::r50k_base;
+
+    // this is gpt-2 model
+    let bpe = r50k_base().unwrap();
+
+    let new_text = "Akwirw ier";
+
+    let tokens = bpe.encode_with_special_tokens(new_text);
+
+    println!("encode: {:?}", tokens);
+
+    let detokenize = bpe.decode(tokens);
+    println!("decode : {:?}", detokenize);
+
+```
