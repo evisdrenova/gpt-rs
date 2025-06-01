@@ -1,11 +1,21 @@
-use file_loader::{load_file, simple_tokenizer};
+use tokenizer::{SimpleTokenizer, load_file, simple_tokenizer};
 
-mod file_loader;
+mod tokenizer;
 
 fn main() {
     let file_name = "the-verdict.txt";
 
     let text = load_file(file_name);
 
-    let _parsed_text = simple_tokenizer(&text);
+    let vocab = simple_tokenizer(&text);
+
+    println!("{:?}", vocab.len());
+
+    let tokenizer: SimpleTokenizer<'_> = SimpleTokenizer::new(vocab);
+
+    let ids = tokenizer.encode("Hello, do you like tea?");
+    println!("Encoded: {:?}", ids);
+
+    let decoded = tokenizer.decode(&ids);
+    println!("Decoded: {}", decoded);
 }
