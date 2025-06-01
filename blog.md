@@ -510,3 +510,40 @@ pub fn create_dataloader_v1(
 ```
 
 This `DataLoaderIterator` struct and implementation defines how the iterator works and moves across the batches and stacks the tensors. We also see those pesky lifetimes again since we're using a reference to the `GPTDataset`.
+
+Let's give it a shot and see what it outputs. We can try using this in our main func:
+
+```rust
+  let file_name = "the-verdict.txt";
+
+    let raw_text = load_file(file_name);
+
+    let dataloader = create_dataloader_v1(&raw_text, 1, 4, 1, false, true).unwrap();
+
+    for (batch_idx, batch_result) in dataloader.iter().take(2).enumerate() {
+        let (inputs, targets) = batch_result.unwrap();
+
+        let input_vec: Vec<Vec<u32>> = inputs.to_vec2().unwrap();
+        let target_vec: Vec<Vec<u32>> = targets.to_vec2().unwrap();
+
+        println!("Batch {}:", batch_idx);
+        println!("  Input tokens: {:?}", input_vec);
+        println!("  Target tokens: {:?}", target_vec);
+        println!();
+    }
+
+```
+
+This outputs:
+
+```
+Batch 0:
+  Input tokens: [[40, 367, 2885, 1464]]
+  Target tokens: [[367, 2885, 1464, 1807]]
+
+Batch 1:
+  Input tokens: [[367, 2885, 1464, 1807]]
+  Target tokens: [[2885, 1464, 1807, 3619]]
+```
+
+Nice! One way to double check this is that the target tokens are 1 token ahead of the input tokens. Looks good!
