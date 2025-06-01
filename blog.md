@@ -134,7 +134,7 @@ Now we can create our encode and decode functions. Luckily, we've pretty much al
 ```rust
 
     pub fn encode(&self, text: &str) -> Vec<usize> {
-        let re = Regex::new(r#"([,.:;?_!"()']|--|\s)"#).unwrap();
+       let re = Regex::new(r#"([,.:;?_!"()']|--|\s)"#).unwrap();
         let mut tokens = Vec::new();
         let mut last_end = 0;
 
@@ -160,8 +160,6 @@ Now we can create our encode and decode functions. Luckily, we've pretty much al
                 tokens.push(token);
             }
         }
-
-        println!("preprocessed: {:?}", tokens);
 
         // Convert tokens to IDs and panic if a word is not the in vocab
     tokens
@@ -194,4 +192,22 @@ And then the decoder is just the opposite process of going from an id to a strin
 
         result
     }
+```
+
+Sweet! Things are coming along. Right now, when we encounter a word that isn't in our vocab, the code panics. So let's start dealing with that. First, let's add in `<|unk|>` and `<|endoftext|>` to handle end of text files when we concat a bunch of pre-training data. And for words we don't have in our vocab, we'll return the `<|unk|>`.
+
+Let's update our `encode` function to to replace unknown words with `<|unk|>`:
+
+```rust
+      tokens
+            .iter()
+            .map(|&s| {
+                self.str_to_int.get(s).copied().unwrap_or_else(|| {
+                    self.str_to_int
+                        .get("<|unk|>")
+                        .copied()
+                        .expect("<|unk|> token not found in vocabulary")
+                })
+            })
+            .collect()
 ```

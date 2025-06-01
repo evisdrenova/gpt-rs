@@ -1,6 +1,6 @@
 use indexmap::IndexMap;
 use regex::Regex;
-use std::{collections::HashSet, fs};
+use std::collections::HashSet;
 
 pub struct SimpleTokenizer<'a> {
     str_to_int: IndexMap<&'a str, usize>,
@@ -22,6 +22,7 @@ impl<'a> SimpleTokenizer<'a> {
 
     pub fn encode(&self, text: &str) -> Vec<usize> {
         let re = Regex::new(r#"([,.:;?_!"()']|--|\s)"#).unwrap();
+
         let mut tokens = Vec::new();
         let mut last_end = 0;
 
@@ -33,6 +34,7 @@ impl<'a> SimpleTokenizer<'a> {
                     tokens.push(token);
                 }
             }
+            // add delimiter
             let delimiter = mat.as_str();
             if !delimiter.trim().is_empty() {
                 tokens.push(delimiter);
@@ -52,10 +54,12 @@ impl<'a> SimpleTokenizer<'a> {
         tokens
             .iter()
             .map(|&s| {
-                self.str_to_int
-                    .get(s)
-                    .copied()
-                    .unwrap_or_else(|| panic!("Token '{}' not found in vocabulary", s))
+                self.str_to_int.get(s).copied().unwrap_or_else(|| {
+                    self.str_to_int
+                        .get("<|unk|>")
+                        .copied()
+                        .expect("<|unk|> token not found in vocabulary")
+                })
             })
             .collect()
     }
@@ -77,13 +81,7 @@ impl<'a> SimpleTokenizer<'a> {
     }
 }
 
-pub fn load_file(file: &str) -> String {
-    let raw_text = fs::read_to_string(file).expect("Failed to read file");
-
-    raw_text
-}
-
-pub fn simple_tokenizer(raw_text: &str) -> IndexMap<&str, usize> {
+pub fn create_vocab(raw_text: &str) -> IndexMap<&str, usize> {
     let re = Regex::new(r#"([,.:;?_!"()']|--|\s)"#).unwrap();
 
     let mut unique_tokens: HashSet<&str> = HashSet::new();
@@ -115,13 +113,14 @@ pub fn simple_tokenizer(raw_text: &str) -> IndexMap<&str, usize> {
     let mut sorted_tokens: Vec<_> = unique_tokens.into_iter().collect();
     sorted_tokens.sort_unstable();
 
-    create_vocab(sorted_tokens)
-}
+    sorted_tokens.push("<|endoftext|>");
+    sorted_tokens.push("<|unk|>");
 
-fn create_vocab(tokens: Vec<&str>) -> IndexMap<&str, usize> {
-    tokens
+    let vocab_tokens = sorted_tokens
         .into_iter()
         .enumerate()
         .map(|(index, token)| (token, index))
-        .collect()
+        .collect();
+
+    vocab_tokens
 }
