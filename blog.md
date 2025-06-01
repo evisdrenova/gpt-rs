@@ -317,8 +317,81 @@ Scalar -> a single value i.e. an integer or a float like 2, 0.45, 10.32 etc.
 Vector -> an array (or vector in rust land) of values i.e. [1,2,3], [0.34, 3.45,23.1]
 Tensor -> a 2-dimensional vector of values [[1,2,3],[4,5,6]], [[0.4,3.5],[9.5,239.1]]
 
-### Creating Tensors
+### Loading Data and Creating Tensors
 
-I was going back and forth on what I wanted to use here. One option is tch-rs which is as close to pytorch as get in rust. It has rust bindings for the C++ API of pytorch. The other option is something like candle which is a hugging face library that implements low-level tensor functions and operations. Another option is burn which is a pure rust implementation but it's still pretty young. I decided to go with tch-rs mainly because it offers the low level operations of creating tensors and the higher level operations that pytorch offers.
+I was going back and forth on what I wanted to use here. One option is tch-rs which is as close to pytorch as get in rust. It has rust bindings for the C++ API of pytorch. The other option is something like candle which is a hugging face library that implements low-level tensor functions and operations. Another option is burn which is a pure rust implementation but it's still pretty young. I decided to go with candle since tch-rs requires py-torch, but we'll see I may have to do tch-rs anyways depending on what comes later.
 
-`cargo add tch-rs`
+`cargo add candle-core`
+
+First things, we need to load our data from our file and be able to create these input-target pairs as tensors efficiently. Let's implement a `GPTDataset` struct and methods that allow us to do this.
+
+Our struct:
+
+```rust
+use candle_core::{Device, Tensor}; // Device comes a little later
+
+struct GPTDataset {
+    input_ids: Vec<Tensor>,
+    target_ids: Vec<Tensor>,
+}
+```
+
+And now our implementation of the `GPTDataset` struct:
+
+```rust
+impl GPTDataset {
+    pub fn new(
+        self,
+        txt: &str,
+        tokenizer: &CoreBPE,
+        max_length: usize,
+        stride: usize,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut input_ids = Vec::new();
+        let mut target_ids = Vec::new();
+
+        let token_ids: Vec<u32> = tokenizer.encode_with_special_tokens(txt);
+
+        let mut i = 0;
+
+        while i + max_length < token_ids.len() {
+            // Extract input chunk
+            let input_chunk = &token_ids[i..i + max_length];
+            // Extract target chunk (shifted by 1)
+            let target_chunk = &token_ids[i + 1..i + max_length + 1];
+
+            // Convert to tensors
+            let device = Device::Cpu;
+            let input_tensor = Tensor::new(input_chunk, &device)?;
+            let target_tensor = Tensor::new(target_chunk, &device)?;
+
+            input_ids.push(input_tensor);
+            target_ids.push(target_tensor);
+
+            i += stride;
+        }
+
+        Ok(GPTDataset {
+            input_ids,
+            target_ids,
+        })
+    }
+
+    pub fn len(&self) -> usize {
+        self.input_ids.len()
+    }
+
+    // gets a single row in the data set
+    pub fn get(&self, idx: usize) -> Option<(&Tensor, &Tensor)> {
+        if idx < self.len() {
+            Some((&self.input_ids[idx], &self.target_ids[idx]))
+        } else {
+            None
+        }
+    }
+}
+```
+
+The `new` function does a lot of the heavy lifting. The sliding window bit is in the `input_chunk` and `target_chunk` variables. In the `input_chunk` we get the id from `i` to `i+max_length`. Then in the `target_chunk` we get the target by incrementing it to the chunk with the `+1` in `i+1..i + max_length +1`. Then we create the tensors using the Candle library and setting the device to be CPU . Then some getter methods.
+
+Let's keep going and add in our `DataLaoder` struct and methods.
