@@ -214,9 +214,9 @@ Let's update our `encode` function to to replace unknown words with `<|unk|>`:
 
 ## Byte Pair Encoding
 
-Byte Pair Encoding (BPE) is the underlying tokenization scheme used by GPT2 and GPT-3. It's a little different than our tokenization scheme but honestly not all that different. It mainly handles unknown words in a much nicer way. If it encounters an unknown word, it breaks it down into sub-words or even letters until we can match it against our vocabulary.
+Byte Pair Encoding (BPE) is the underlying tokenization scheme used by GPT2 and GPT-3. It's not all that different than our simple tokenization scheme, just more powerful. The actual vocabulary that GPT2/3 use is about 50,257 tokens long.
 
-The actual vocabulary that GPT2/3 use is about 50,257 tokens long. For example, the unknown word: "Akwirw ier" will get encoded as: [33901, 86, 343, 86, 220, 959]. And then when we decode it, we get "Akwirw ier" back again. This is nice because then it doesn't have to replace unknown words with `<|unk|>`.
+If it encounters an unknown word, it breaks it down into sub-words or even letters until we can match it against our vocabulary. For example, the unknown word: "Akwirw ier" will get encoded as: [33901, 86, 343, 86, 220, 959]. And then when we decode it, we get "Akwirw ier" back again. This is nice because then it doesn't have to replace unknown words with `<|unk|>`.
 
 The [BPE](https://github.com/openai/tiktoken) that OpenAI used is actually written in Rust but interfaces through Python. Luckily someone had already written a [Rust port](https://github.com/zurawiki/tiktoken-rs?tab=readme-ov-file), so to save ourselves some time, I just picked that one up.
 
@@ -239,3 +239,86 @@ This is how we can use it:
     println!("decode : {:?}", detokenize);
 
 ```
+
+Moving forward we'll use the BPE tokenizer and will ignore our simple tokenizer. Even though we won't be using it, it was fun to build!
+
+## Data Sampling with a Sliding Window
+
+LLMs predict the next token in a sentence. In order to train our LLM, we need to generate input-target pairs. We can do this by assigning the input to an X variable and then the output to a Y variable which is just one word past the X.
+
+So if the sentence is: "Let's train an LLM together".
+
+let x = "train" (will be tokenized)
+let y = "an" (one word past the x variable)
+
+This is how we train the LLM. We give it the input, then we ask it to predict the next token, then we can check if it predicted the right one based on the y variable.
+
+Here's how we set it up:
+
+```rust
+
+    let file_name = "the-verdict.txt";
+
+    let raw_text = load_file(file_name);
+
+    // this is gpt-2 tokenizer
+    let bpe = r50k_base().unwrap();
+
+    let enc_text = bpe.encode_with_special_tokens(&raw_text);
+
+    println!("Tokens: {:?}", enc_text.len());
+
+    let enc_sample = &enc_text[50..];
+
+    let context_size = 4;
+
+    let x = &enc_sample[..context_size];
+    let y = &enc_sample[1..context_size + 1];
+
+    println!("x:    {:?}", x);
+    println!("y:        {:?}", y);
+```
+
+This prints out:
+
+```
+x:    [290, 4920, 2241, 287]
+y:         [4920, 2241, 287, 257]
+```
+
+If we convert the tokenIDs to words, we get:
+
+```rust
+for i in 1..context_size + 1 {
+        let context = &enc_sample[..i];
+        let desired = enc_sample[i];
+        println!(
+            "{:?} ----> {:?}",
+            bpe.decode(context.to_vec()).unwrap(),
+            bpe.decode(vec![desired]).unwrap()
+        )
+    }
+```
+
+```
+" and" ----> " established"
+" and established" ----> " himself"
+" and established himself" ----> " in"
+" and established himself in" ----> " a"
+```
+
+You can see the sliding window here in the words much better. Now let's do this for the entire data set. We'll create an input tensor and a target tensor.
+
+### Scalars, Vectors and Tensors
+
+A quick reminder on scalars, vectors and tensors.
+
+Scalar -> a single value i.e. an integer or a float like 2, 0.45, 10.32 etc.
+Vector -> an array (or vector in rust land) of values i.e. [1,2,3], [0.34, 3.45,23.1]
+Tensor -> a 2-dimensional vector of values [[1,2,3],[4,5,6]], [[0.4,3.5],[9.5,239.1]]
+
+### Creating Tensors
+
+I was going back and forth on what I wanted to use here. One option is tch-rs which is as close to pytorch as get in rust. It has rust bindings for the C++ API of pytorch. The other option is something like candle which is a hugging face library that implements low-level tensor functions and operations. Another option is burn which is a pure rust implementation but it's still pretty young. I decided to go with tch-rs mainly because it offers the low level operations of creating tensors and the higher level operations that pytorch offers.
+
+`cargo add tch-rs`

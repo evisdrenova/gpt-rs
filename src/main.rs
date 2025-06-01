@@ -1,41 +1,39 @@
 use file_operations::load_file;
-use tokenizer::{SimpleTokenizer, create_vocab};
 
 mod file_operations;
-mod tokenizer;
+mod simple_tokenizer;
 
 use tiktoken_rs::r50k_base;
 
 fn main() {
     let file_name = "the-verdict.txt";
 
-    let text = load_file(file_name);
-
-    let vocab = create_vocab(&text);
-
-    println!("{:?}", vocab.len());
-    let text1 = "Hello, do you like tea?";
-    let text2 = "In the sunlit terraces of the palace.";
-    let text = text1.to_string() + " <|endoftext|> " + text2;
-    println!("{:?}", text);
-
-    let tokenizer: SimpleTokenizer<'_> = SimpleTokenizer::new(vocab);
-
-    let ids = tokenizer.encode(&text);
-    println!("Encoded: {:?}", ids);
-
-    let decoded = tokenizer.decode(&ids);
-    println!("Decoded: {}", decoded);
+    let raw_text = load_file(file_name);
 
     // this is gpt-2 tokenizer
     let bpe = r50k_base().unwrap();
 
-    let new_text = "Akwirw ier";
+    let enc_text = bpe.encode_with_special_tokens(&raw_text);
 
-    let tokens = bpe.encode_with_special_tokens(new_text);
+    println!("Tokens: {:?}", enc_text.len());
 
-    println!("Tokens: {:?}", tokens);
+    let enc_sample = &enc_text[50..];
 
-    let detokenize = bpe.decode(tokens);
-    println!("detokenize : {:?}", detokenize);
+    let context_size = 4;
+
+    let x = &enc_sample[..context_size];
+    let y = &enc_sample[1..context_size + 1];
+
+    println!("x:    {:?}", x);
+    println!("y:        {:?}", y);
+
+    for i in 1..context_size + 1 {
+        let context = &enc_sample[..i];
+        let desired = enc_sample[i];
+        println!(
+            "{:?} ----> {:?}",
+            bpe.decode(context.to_vec()).unwrap(),
+            bpe.decode(vec![desired]).unwrap()
+        )
+    }
 }
