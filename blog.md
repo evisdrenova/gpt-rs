@@ -395,3 +395,118 @@ impl GPTDataset {
 The `new` function does a lot of the heavy lifting. The sliding window bit is in the `input_chunk` and `target_chunk` variables. In the `input_chunk` we get the id from `i` to `i+max_length`. Then in the `target_chunk` we get the target by incrementing it to the chunk with the `+1` in `i+1..i + max_length +1`. Then we create the tensors using the Candle library and setting the device to be CPU . Then some getter methods.
 
 Let's keep going and add in our `DataLaoder` struct and methods.
+
+```rust
+pub struct DataLoader {
+    dataset: GPTDataset,
+    batch_size: usize,
+    shuffle: bool,
+    drop_last: bool,
+}
+```
+
+We set some inputs into the `DataLoader` struct that will tune our data loader. Next our implementation:
+
+```rust
+impl DataLoader {
+
+    // instantiate a new dataloader instance
+    pub fn new(dataset: GPTDataset, batch_size: usize, shuffle: bool, drop_last: bool) -> Self {
+        DataLoader {
+            dataset,
+            batch_size,
+            shuffle,
+            drop_last,
+        }
+    }
+
+    // create an ityerator on the dataloader
+
+    pub fn iter(&self) -> DataLoaderIterator {
+        let mut indices: Vec<usize> = (0..self.dataset.len()).collect();
+
+        if self.shuffle {
+            let mut rng = rng();
+            indices.shuffle(&mut rng);
+        }
+
+        DataLoaderIterator {
+            dataset: &self.dataset,
+            indices,
+            batch_size: self.batch_size,
+            current: 0,
+            drop_last: self.drop_last,
+        }
+    }
+}
+```
+
+The `DataLoader` struct defines the params that we want to use when we load the data. Note that we're not doing any async or parallel loading. Trying to keep it relatively simply. The `iter()` is a wrapper for a `DataLoaderIterator` implementation which we'll see next. And then lastly our `DataIterator` struct and implementation:
+
+```rust
+pub struct DataLoaderIterator<'a> {
+    dataset: &'a GPTDataset,
+    indices: Vec<usize>,
+    batch_size: usize,
+    current: usize,
+    drop_last: bool,
+}
+
+impl<'a> Iterator for DataLoaderIterator<'a> {
+    type Item = Result<(Tensor, Tensor), Box<dyn std::error::Error>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // out of bounds, return
+        if self.current >= self.indices.len() {
+            return None;
+        }
+
+        let batch_end = (self.current + self.batch_size).min(self.indices.len());
+
+        // Check if we should drop the last batch
+        if self.drop_last && batch_end - self.current < self.batch_size {
+            return None;
+        }
+
+        // Collect batch tensors
+        let mut input_batch = Vec::new();
+        let mut target_batch = Vec::new();
+
+        for i in self.current..batch_end {
+            let idx = self.indices[i];
+            if let Some((input, target)) = self.dataset.get(idx) {
+                input_batch.push(input.clone());
+                target_batch.push(target.clone());
+            }
+        }
+
+        self.current = batch_end;
+
+        // Stack tensors into batch
+        match (
+            Tensor::stack(&input_batch, 0),
+            Tensor::stack(&target_batch, 0),
+        ) {
+            (Ok(inputs), Ok(targets)) => Some(Ok((inputs, targets))),
+            (Err(e), _) | (_, Err(e)) => Some(Err(Box::new(e))),
+        }
+    }
+}
+
+pub fn create_dataloader_v1(
+    txt: &str,
+    batch_size: usize,
+    max_length: usize,
+    stride: usize,
+    shuffle: bool,
+    drop_last: bool,
+) -> Result<DataLoader, Box<dyn std::error::Error>> {
+    let tokenizer = r50k_base()?;
+
+    let dataset = GPTDataset::new(txt, &tokenizer, max_length, stride)?;
+
+    Ok(DataLoader::new(dataset, batch_size, shuffle, drop_last))
+}
+```
+
+This `DataLoaderIterator` struct and implementation defines how the iterator works and moves across the batches and stacks the tensors. We also see those pesky lifetimes again since we're using a reference to the `GPTDataset`.

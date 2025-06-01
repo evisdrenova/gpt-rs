@@ -502,6 +502,7 @@ dependencies = [
  "candle-core",
  "indexmap",
  "once_cell",
+ "rand",
  "regex",
  "tiktoken-rs",
 ]

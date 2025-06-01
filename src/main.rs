@@ -10,13 +10,15 @@ fn main() {
 
     let dataloader = create_dataloader_v1(&raw_text, 1, 4, 1, false, true).unwrap();
 
-    if let Some(batch_result) = dataloader.iter().next() {
+    for (batch_idx, batch_result) in dataloader.iter().take(2).enumerate() {
         let (inputs, targets) = batch_result.unwrap();
 
         let input_vec: Vec<Vec<u32>> = inputs.to_vec2().unwrap();
         let target_vec: Vec<Vec<u32>> = targets.to_vec2().unwrap();
 
-        println!("Input tokens: {:?}", input_vec);
-        println!("Target tokens: {:?}", target_vec);
+        println!("Batch {}:", batch_idx);
+        println!("  Input tokens: {:?}", input_vec);
+        println!("  Target tokens: {:?}", target_vec);
+        println!();
     }
 }

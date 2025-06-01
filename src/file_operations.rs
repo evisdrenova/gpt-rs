@@ -1,4 +1,6 @@
 use candle_core::{Device, Tensor};
+use rand::rng;
+use rand::seq::SliceRandom;
 use std::fs;
 use tiktoken_rs::{CoreBPE, r50k_base};
 
@@ -81,16 +83,14 @@ impl DataLoader {
         }
     }
 
+    // iterator on the data loader
     pub fn iter(&self) -> DataLoaderIterator {
-        let indices: Vec<usize> = (0..self.dataset.len()).collect();
-        let indices = if self.shuffle {
-            // For proper shuffling, you'd want to use rand crate
-            // use rand::seq::SliceRandom;
-            // indices.shuffle(&mut rand::thread_rng());
-            indices // For now, not shuffling
-        } else {
-            indices
-        };
+        let mut indices: Vec<usize> = (0..self.dataset.len()).collect();
+
+        if self.shuffle {
+            let mut rng = rng();
+            indices.shuffle(&mut rng);
+        }
 
         DataLoaderIterator {
             dataset: &self.dataset,
@@ -114,6 +114,7 @@ impl<'a> Iterator for DataLoaderIterator<'a> {
     type Item = Result<(Tensor, Tensor), Box<dyn std::error::Error>>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        // out of bounds, return
         if self.current >= self.indices.len() {
             return None;
         }
