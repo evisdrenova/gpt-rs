@@ -8,7 +8,16 @@ fn main() {
 
     let raw_text = load_file(file_name);
 
-    let dataloader = create_dataloader_v1(&raw_text, 1, 4, 1, false, true).unwrap();
+    let max_length = 4;
+    let batch_size = 8;
+    let stride = 4;
+    let shuffle = false;
+    let drop_last = true;
+
+    let dataloader = create_dataloader_v1(
+        &raw_text, batch_size, max_length, stride, shuffle, drop_last,
+    )
+    .unwrap();
 
     for (batch_idx, batch_result) in dataloader.iter().take(2).enumerate() {
         let (inputs, targets) = batch_result.unwrap();
@@ -19,6 +28,10 @@ fn main() {
         println!("Batch {}:", batch_idx);
         println!("  Input tokens: {:?}", input_vec);
         println!("  Target tokens: {:?}", target_vec);
-        println!();
+        println!("inputs shape: {:?}", inputs.shape());
     }
+
+    let vocab_size = 50257;
+    // let output_dim = 256;
+    // let token_embedding_layer = candle_core::Embedding(vocab_size, output_dim)
 }

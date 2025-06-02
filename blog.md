@@ -546,4 +546,57 @@ Batch 1:
   Target tokens: [[2885, 1464, 1807, 3619]]
 ```
 
-Nice! One way to double check this is that the target tokens are 1 token ahead of the input tokens. Looks good!
+Nice! One way to double check this is that the target tokens are 1 token ahead of the input tokens. This is set by the `stride` hyperparameter. It dictates the number of positions the inputs shift across batches, creating a sliding window approach. By setting the stride equal to the input window size (or the max_length) we prevent any overlaps in the input-target text.
+
+## Creating Token Embeddings
+
+We create token embeddings from our tokenIDs. These embeddings are ultimately what gets fed into the LLM. It's important that we also encode the position of the tokenID in the embedding to help the LLM learn how the tokends relate to the each other. This is analogous to ordering the rows in the tensor in order of the words as they appear in the sentence. 
+
+There are two types of positional encoding. The first is absolute which means that we encode the tokens position based on the order they appear in the sentence. The second is relative positional encoding which means we encode the tokens based on their distance in embedding space from each other.
+
+Let's run the same code as before (I also just factored out the params for the dataloader into their own variables to make changing them easier) but let's also print out the shape of the tensor:
+
+```rust
+   let file_name = "the-verdict.txt";
+
+    let raw_text = load_file(file_name);
+
+    let max_length = 4;
+    let batch_size = 8;
+    let stride = 4;
+    let shuffle = false;
+    let drop_last = true;
+
+    let dataloader = create_dataloader_v1(
+        &raw_text, batch_size, max_length, stride, shuffle, drop_last,
+    )
+    .unwrap();
+
+    for (batch_idx, batch_result) in dataloader.iter().take(2).enumerate() {
+        let (inputs, targets) = batch_result.unwrap();
+
+        let input_vec: Vec<Vec<u32>> = inputs.to_vec2().unwrap();
+        let target_vec: Vec<Vec<u32>> = targets.to_vec2().unwrap();
+
+        println!("Batch {}:", batch_idx);
+        println!("  Input tokens: {:?}", input_vec);
+        println!("  Target tokens: {:?}", target_vec);
+        println!("inputs shape: {:?}", inputs.shape());
+    }
+```
+
+We get: 
+
+```
+Batch 0:
+  Input tokens: [[40, 367, 2885, 1464], [1807, 3619, 402, 271], [10899, 2138, 257, 7026], [15632, 438, 2016, 257], [922, 5891, 1576, 438], [568, 340, 373, 645], [1049, 5975, 284, 502], [284, 3285, 326, 11]]
+  Target tokens: [[367, 2885, 1464, 1807], [3619, 402, 271, 10899], [2138, 257, 7026, 15632], [438, 2016, 257, 922], [5891, 1576, 438, 568], [340, 373, 645, 1049], [5975, 284, 502, 284], [3285, 326, 11, 287]]
+inputs shape: [8, 4]
+Batch 1:
+  Input tokens: [[287, 262, 6001, 286], [465, 13476, 11, 339], [550, 5710, 465, 12036], [11, 6405, 257, 5527], [27075, 11, 290, 4920], [2241, 287, 257, 4489], [64, 319, 262, 34686], [41976, 13, 357, 10915]]
+  Target tokens: [[262, 6001, 286, 465], [13476, 11, 339, 550], [5710, 465, 12036, 11], [6405, 257, 5527, 27075], [11, 290, 4920, 2241], [287, 257, 4489, 64], [319, 262, 34686, 41976], [13, 357, 10915, 314]]
+inputs shape: [8, 4]
+```
+
+The tokenIDs are the same as before (good!) and the input shape is the new thing we just printed. It's telling us that there 8 samples in each batch and each sample has 4 tokens each. It's a vector with 8 vectors as elements and each vector element has 4 elements in it. 
+
