@@ -1,5 +1,8 @@
+use candle_core::Device;
+use embedding::Embedding;
 use file_operations::{create_dataloader_v1, load_file};
 
+mod embedding;
 mod file_operations;
 mod simple_tokenizer;
 
@@ -31,7 +34,15 @@ fn main() {
         println!("inputs shape: {:?}", inputs.shape());
     }
 
-    let vocab_size = 50257;
-    // let output_dim = 256;
-    // let token_embedding_layer = candle_core::Embedding(vocab_size, output_dim)
+    let vocab_size: i64 = 50_257;
+    let output_dim: i64 = 256;
+    let device: Device = Device::Cpu;
+
+    let embed = Embedding::new(vocab_size, output_dim, device);
+    let batch_size = 2;
+    let seq_len = 5;
+
+    // update to be the token_ids from the batch
+    let embeddings = embed.forward(&token_ids);
+    println!("embeddings shape: {:?}", embeddings.dims());
 }
