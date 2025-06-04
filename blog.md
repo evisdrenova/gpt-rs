@@ -550,7 +550,7 @@ Nice! One way to double check this is that the target tokens are 1 token ahead o
 
 ## Creating Token Embeddings
 
-We create token embeddings from our tokenIDs. These embeddings are ultimately what gets fed into the LLM. It's important that we also encode the position of the tokenID in the embedding to help the LLM learn how the tokends relate to the each other. This is analogous to ordering the rows in the tensor in order of the words as they appear in the sentence. 
+We create token embeddings from our tokenIDs. These embeddings are ultimately what gets fed into the LLM. It's important that we also encode the position of the tokenID in the embedding to help the LLM learn how the tokends relate to the each other. This is analogous to ordering the rows in the tensor in order of the words as they appear in the sentence.
 
 There are two types of positional encoding. The first is absolute which means that we encode the tokens position based on the order they appear in the sentence. The second is relative positional encoding which means we encode the tokens based on their distance in embedding space from each other.
 
@@ -585,7 +585,7 @@ Let's run the same code as before (I also just factored out the params for the d
     }
 ```
 
-We get: 
+We get:
 
 ```
 Batch 0:
@@ -598,5 +598,4 @@ Batch 1:
 inputs shape: [8, 4]
 ```
 
-The tokenIDs are the same as before (good!) and the input shape is the new thing we just printed. It's telling us that there 8 samples in each batch and each sample has 4 tokens each. It's a vector with 8 vectors as elements and each vector element has 4 elements in it. 
-
+The tokenIDs are the same as before (good!) and the input shape is the new thing we just printed. It's telling us that there 8 samples in each batch and each sample has 4 tokens each. It's a vector with 8 vectors as elements and each vector element has 4 elements in it.
