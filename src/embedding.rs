@@ -20,26 +20,34 @@ impl Embedding {
     }
 
     pub fn forward(&self, token_ids: &Tensor) -> Result<Tensor> {
-        //   If `token_ids` has shape [batch_size, seq_len], then
-        //   `weights.index_select(0, token_ids.flatten())` will yield a
-        //   [batch_size * seq_len, output_dim] matrix. We then reshape to
-        //   [batch_size, seq_len, output_dim].
+        let shape = token_ids.dims();
 
-        let (batch_size, seq_len) = {
-            let shape = token_ids.dims();
-            (shape[0], shape[1])
+        // handle both 1d and 2d vectors
+        let (batch_size, seq_len, is_1d) = match shape.len() {
+            1 => (1, shape[0], true),         // 1D input: treat as batch_size=1
+            2 => (shape[0], shape[1], false), // 2D input: normal case
+            _ => {
+                return Err(candle_core::Error::Msg(
+                    "Input must be 1D or 2D tensor".into(),
+                ));
+            }
         };
 
-        // flatten the token_ids into a 1-dim vector
+        // Flatten the token_ids into a 1-dim vector
         let flat_ids = token_ids.flatten_all()?;
 
-        // index_select on dim=0
+        // Index_select on dim=0 (indexes first, then dimension)
         let gathered = self.weights.index_select(&flat_ids, 0)?;
 
-        // reshape to [batch_size, seq_len, output)dim]
+        // Reshape to [batch_size, seq_len, output_dim]
         let output_dim = self.weights.dims()[1];
-        let out = gathered.reshape(&[batch_size, seq_len, output_dim])?;
+        let reshaped = gathered.reshape(&[batch_size, seq_len, output_dim])?;
 
-        Ok(out)
+        // If input was 1D, squeeze out the batch dimension to match PyTorch behavior
+        if is_1d {
+            reshaped.squeeze(0)
+        } else {
+            Ok(reshaped)
+        }
     }
 }
