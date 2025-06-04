@@ -37,13 +37,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output_dim: i64 = 3;
     let device = Device::Cpu;
 
-    // Create 1D tensor just like PyTorch: torch.tensor([2, 3, 5, 1])
-    let ids: Vec<i64> = vec![2, 3, 5, 1];
+    let ids: Vec<i64> = vec![3];
     let input_ids = candle_core::Tensor::new(ids, &device)?;
 
     let embed = Embedding::new(vocab_size, output_dim, device)?;
 
-    // Print the embedding weights (like embedding_layer.weight in PyTorch)
     println!("Embedding weights:");
     let weights_vec: Vec<Vec<f32>> = embed.weights.to_vec2()?;
     for (i, row) in weights_vec.iter().enumerate() {
@@ -51,7 +49,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     println!("Weights shape: {:?}", embed.weights.dims());
 
-    // This will now work with 1D input just like PyTorch
     let embeddings = embed.forward(&input_ids)?;
     println!("input_ids shape: {:?}", input_ids.dims());
     println!("embeddings shape: {:?}", embeddings.dims());
