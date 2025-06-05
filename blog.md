@@ -599,3 +599,100 @@ inputs shape: [8, 4]
 ```
 
 The tokenIDs are the same as before (good!) and the input shape is the new thing we just printed. It's telling us that there 8 samples in each batch and each sample has 4 tokens each. It's a vector with 8 vectors as elements and each vector element has 4 elements in it.
+
+### Creating an Embedding layer
+
+Now to start creating some weights. Here is where our `candle_core` decision over `tch-rs` is starting to haunt us a little bit (or make it more fun!). `candle_core` is fairly low level and it doesn't have a nice way to create an embedding layer. So we're going to create ourselves.
+
+First, let's think about what we need. We need a way to matrix multiply tensors in order to get a weight matrix that we can then use to loop up weights later on.
+
+So first, let's create a struct.
+
+```rust
+use candle_core::{Device, Result, Tensor};
+
+pub struct Embedding {
+    pub weights: Tensor,
+}
+```
+
+A field called 'weights' is going to hold our weights which will be `Tensor` types from the `candle_core` library. Now onto the implementation:
+
+```rust
+impl Embedding {
+    // creates a weight matrix with mean 0, std of 1 and shape[vocab_size*output_dim
+    pub fn new(vocab_size: i64, output_dim: i64, device: Device) -> Result<Embedding> {
+        let weights = Tensor::randn(
+            0.0f32,
+            1.0f32,
+            &[vocab_size as usize, output_dim as usize],
+            &device,
+        )?;
+        Ok(Embedding { weights })
+    }
+}
+```
+
+First, we'll create a way to instantiate a new embedding layer with a `new` method. This will take in our vocab size (which should usually be 50,267 like GPT-2/3), an `output_dim` argument which will dictate how many dimensions we want to output and lastly a `device` param which will tell candle where to run the computation i.e. CPU vs GPU.
+
+Then we'll randomly initialize the weights using the built in `Tensor::randn` method which takes in a mean, standard deviation, shape and then a device. Since we're just randomly initializing the weights, we can set the mean to 0 and standard deviation to 1. The shape is going to be our [vocab size * output_dim] and device is .. device.
+
+Then we'll wrap the struct in an Ok and return a result with the Embedding struct and weights. Next, let's add in a forward pass.
+
+```rust
+impl Embedding {
+    // creates a weight matrix with mean 0, std of 1 and shape[vocab_size*output_dim
+    pub fn new(vocab_size: i64, output_dim: i64, device: Device) -> Result<Embedding> {
+        let weights = Tensor::randn(
+            0.0f32,
+            1.0f32,
+            &[vocab_size as usize, output_dim as usize],
+            &device,
+        )?;
+        Ok(Embedding { weights })
+    }
+
+    pub fn forward(&self, token_ids: &Tensor) -> Result<Tensor> {
+        let shape = token_ids.dims();
+
+        // handle both 1d and 2d vectors
+        let (batch_size, seq_len, is_1d) = match shape.len() {
+            1 => (1, shape[0], true),
+            2 => (shape[0], shape[1], false),
+            _ => {
+                return Err(candle_core::Error::Msg(
+                    "Input must be 1D or 2D tensor".into(),
+                ));
+            }
+        };
+
+        // flatten the token_ids into a 1-dim vector
+        let flat_ids = if is_1d {
+            token_ids.clone()
+        } else {
+            token_ids.flatten_all()?
+        };
+
+        // index_select on dim=0
+        let gathered = self.weights.index_select(&flat_ids, 0)?;
+
+        // reshape to [batch_size, seq_len, output_dim]
+        let output_dim = self.weights.dims()[1];
+        let reshaped = gathered.reshape(&[batch_size, seq_len, output_dim])?;
+
+        if is_1d {
+            reshaped.squeeze(0) // if 1d the reshape so it's 0 dim
+        } else {
+            Ok(reshaped)
+        }
+    }
+}
+```
+
+Let's go over the forward pass i.e. `forward` method. The forward pass is a look up operation on the weight matrix based on the `token_ids` that the user passes in.
+
+It takes in a `&self` argument and then a `Tensor` pointer to `token_ids` and returns a `Tensor` wrapped in a `Result`. First, we get the shape from the `token_ids` (which we will need later) and then we run a match to set the right batch_size and seq_len, and also set if its a 1 dimensional tensor.
+
+Then we flatten the `token_id` tensor if it's not a 1 dimensional tensor. Flattening the tensor allows us to then run an index select or look up on the weights by the `token_ids` that the user passed in.
+
+Once we've done the look up operation, we reshape the output tensor based on the shape and then return it.
