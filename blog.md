@@ -696,3 +696,75 @@ It takes in a `&self` argument and then a `Tensor` pointer to `token_ids` and re
 Then we flatten the `token_id` tensor if it's not a 1 dimensional tensor. Flattening the tensor allows us to then run an index select or look up on the weights by the `token_ids` that the user passed in.
 
 Once we've done the look up operation, we reshape the output tensor based on the shape and then return it.
+
+### Back to our positional encodings
+
+Now that we've got our embedding layers all sorted, let's put in our positional encodings. We mentioned earlier that there are two types of encoding: absolute and relative. We're going to go with absolute this time.
+
+There are two steps here: 1. create another embedding layer with the same dimensionality as our token embeddings to encode the position of the `token_ids` and then add the resulting tensor to the token embedding layer tensor.
+
+Let's update our main driver function:
+
+```rust
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let file_name = "the-verdict.txt";
+
+    let raw_text = load_file(file_name);
+
+    let max_length: i64 = 4;
+    let batch_size = 8;
+    let stride = 4;
+    let shuffle = false;
+    let drop_last = true;
+    let context_length = 4;
+    let vocab_size: i64 = 50267;
+    let output_dim: i64 = 256;
+    let device = Device::Cpu;
+
+    let dataloader = create_dataloader_v1(
+        &raw_text,
+        batch_size,
+        max_length as usize,
+        stride,
+        shuffle,
+        drop_last,
+    )?;
+
+    // only does one batch
+    if let Some(batch_result) = dataloader.iter().next() {
+        let (inputs, targets) = batch_result?;
+
+        let input_vec: Vec<Vec<u32>> = inputs.to_vec2()?;
+        let target_vec: Vec<Vec<u32>> = targets.to_vec2()?;
+
+        println!("  Input tokens: {:?}", input_vec);
+        println!("  Target tokens: {:?}", target_vec);
+        println!("inputs shape: {:?}", inputs.shape());
+
+        // create token embedding layer
+        let token_embedding_layer = Embedding::new(vocab_size, output_dim, Device::Cpu)?;
+        let token_embeddings = token_embedding_layer.forward(&inputs)?;
+
+        // creates positional token embedding layer
+        let pos_embedding_layer = Embedding::new(context_length, output_dim, Device::Cpu)?;
+
+        let placeholder_vector = Tensor::arange(0i64, context_length as i64, &Device::Cpu);
+
+        let pos_emebeddings = pos_embedding_layer.forward(&placeholder_vector?)?;
+
+        println!("embeddings shape: {:?}", token_embeddings.dims());
+        println!("positional embedding shape: {:?}", pos_emebeddings.dims());
+
+        let result_with_broadcast = token_embeddings.broadcast_add(&pos_emebeddings)?;
+        println!(
+            "Broadcasted result shape: {:?}",
+            result_with_broadcast.dims()
+        );
+    }
+    Ok(())
+}
+```
+
+Now we're creating a second embedding layer and then add the two layers together. Since they have different shapes with the `token_Embeddings` as [8,4,256] and the `pos_embeddings` as [4,256], we can do `broadcast_add()` which will handle resolving the shapes for us and add them together nicely by doing element-wise addition starting with the right-most element.
+
+We can verify it worked correctly by checking that the resulting shape is [8,4,256].
