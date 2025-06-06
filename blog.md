@@ -768,3 +768,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 Now we're creating a second embedding layer and then add the two layers together. Since they have different shapes with the `token_Embeddings` as [8,4,256] and the `pos_embeddings` as [4,256], we can do `broadcast_add()` which will handle resolving the shapes for us and add them together nicely by doing element-wise addition starting with the right-most element.
 
 We can verify it worked correctly by checking that the resulting shape is [8,4,256].
+
+# Coding Attention Mechanisms
+
+Self attention is a mechanism that allows each position in the input sequence to consider the relevancy of, or "attend to" all other positions in the same sequence when computing the representation of a sequence.
