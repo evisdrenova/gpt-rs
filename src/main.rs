@@ -1,4 +1,4 @@
-use candle_core::{Device, Tensor};
+use candle_core::{Device, Error, Tensor};
 use embedding::Embedding;
 use file_operations::{create_dataloader_v1, load_file};
 use tiktoken_rs::r50k_base;
@@ -34,13 +34,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(batch_result) = dataloader.iter().next() {
         let (inputs, targets) = batch_result?;
 
-        let bpe = r50k_base().unwrap();
+        // let bpe = r50k_base().unwrap();
 
-        let new_text = "Your joueny starts with one step";
+        // let new_text = "Your joueny starts with one step";
 
-        let tokens = bpe.encode_with_special_tokens(new_text);
+        // let tokens = bpe.encode_with_special_tokens(new_text);
 
-        println!("encode: {:?}", tokens);
+        // println!("encode: {:?}", tokens);
 
         let input_vec: Vec<Vec<u32>> = inputs.to_vec2()?;
         let target_vec: Vec<Vec<u32>> = targets.to_vec2()?;
@@ -110,5 +110,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // println!("input_ids shape: {:?}", input_ids.dims());
     // println!("embeddings shape: {:?}", embeddings.dims());
 
+    let data = vec![
+        0.43, 0.15, 0.89, // Your (x^1)
+        0.55, 0.87, 0.66, // journey (x^2)
+        0.57, 0.85, 0.64, // starts (x^3)
+        0.22, 0.58, 0.33, // with (x^4)
+        0.77, 0.25, 0.10, // one (x^5)
+        0.05, 0.80, 0.55, // step (x^6)
+    ];
+
+    // Create tensor with shape [6, 3] (6 rows, 3 columns)
+    let inputs: Tensor = Tensor::from_vec(data, (6, 3), &Device::Cpu)?;
+
+    // Print the tensor
+    println!("Inputs tensor:");
+    println!("{}", inputs);
+
+    // get the first index in the inputs tensor which is the tokenized word "journey"
+    let query = inputs.get(1);
+
+    let query_tensor = query?;
+
+    let output = compute_intermediate_attention_scores(&inputs, &query_tensor)?;
+
+    println!("print the attention scores: {:?}", output);
+
     Ok(())
+}
+
+fn compute_intermediate_attention_scores(inputs: &Tensor, query: &Tensor) -> Result<Tensor, Error> {
+    let atten_scores = inputs.matmul(&query.unsqueeze(1)?)?;
+    let attn_scores_flat = atten_scores.flatten_all()?;
+
+    Ok(attn_scores_flat)
 }

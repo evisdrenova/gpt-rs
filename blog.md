@@ -773,7 +773,66 @@ We can verify it worked correctly by checking that the resulting shape is [8,4,2
 
 Self attention is a mechanism that allows each position in the input sequence to consider the relevancy of, or "attend to" all other positions in the same sequence when computing the representation of a sequence.
 
-The goal of self-attention is to compute a context vector for each input element that combines information from all other input elements. The importance or contribution of each input element for computing the context vector is determined by the attention weights. 
+The goal of self-attention is to compute a context vector for each input element that combines information from all other input elements. The importance or contribution of each input element for computing the context vector is determined by the attention weights.
 
-Essentially, for each token, you're computing weights from every other input element to determine how relevant other tokens are to this token. 
+Essentially, for each token, you're computing weights from every other input element to determine how relevant other tokens are to this token.
 
+In order to do this,let's work through an example.
+
+Assume we've embedding the sentence "Your journey starts with one step" into a 3 dimensions and the resulting tensor is:
+
+```rust
+    let data = vec![
+        0.43, 0.15, 0.89, // Your (x^1)
+        0.55, 0.87, 0.66, // journey (x^2)
+        0.57, 0.85, 0.64, // starts (x^3)
+        0.22, 0.58, 0.33, // with (x^4)
+        0.77, 0.25, 0.10, // one (x^5)
+        0.05, 0.80, 0.55, // step (x^6)
+    ];
+```
+
+Now let's create a tensor from that with the shape [6,3] meaning 6 rows and 3 columns in each row (3 values in each vector):
+
+`let inputs: Tensor = Tensor::from_vec(data, (6, 3), &Device::Cpu)?;`
+
+Which will print to:
+
+```rust
+Inputs tensor:
+[[0.4300, 0.1500, 0.8900],
+ [0.5500, 0.8700, 0.6600],
+ [0.5700, 0.8500, 0.6400],
+ [0.2200, 0.5800, 0.3300],
+ [0.7700, 0.2500, 0.1000],
+ [0.0500, 0.8000, 0.5500]]
+```
+
+Nice. Next let's compute the intermediate attention scores between a query token (in this case the word journey at index 1) and each input token(every token in the input sentence). This will give us the attention or relevancy of the different tokens in the sentence with respect to the token at index 1.
+
+The code is quite simple but powerful:
+
+```rust
+    // get our query token by using the get method to get the token at index 1
+    let query = inputs.get(1);
+    // unwrap the query to get the tensor
+    let query_tensor = query?;
+
+    //calc the dot product of the query tensor with each element of the input tensor
+    let atten_scores = inputs.matmul(&query.unsqueeze(1)?)?;
+    // flatten the result into a one dimensional vector
+    let attn_scores_flat = atten_scores.flatten_all()?;
+
+
+    println!("print the attention scores: {:?}", attn_scores_flat);
+
+    Ok(())
+```
+
+We're taking the dot product (matmul or element-wise matrix multiplication and sum) of the query tensor with the input tensor. When we run that we get:
+
+```
+print the attention scores: Tensor[0.9544, 1.495, 1.4754, 0.8433999999999999, 0.7070000000000001, 1.0865; f64]
+```
+
+THis is our attention score for the query at input[1].
