@@ -772,3 +772,8 @@ We can verify it worked correctly by checking that the resulting shape is [8,4,2
 # Coding Attention Mechanisms
 
 Self attention is a mechanism that allows each position in the input sequence to consider the relevancy of, or "attend to" all other positions in the same sequence when computing the representation of a sequence.
+
+The goal of self-attention is to compute a context vector for each input element that combines information from all other input elements. The importance or contribution of each input element for computing the context vector is determined by the attention weights. 
+
+Essentially, for each token, you're computing weights from every other input element to determine how relevant other tokens are to this token. 
+

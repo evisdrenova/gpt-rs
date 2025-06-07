@@ -1,6 +1,7 @@
 use candle_core::{Device, Tensor};
 use embedding::Embedding;
 use file_operations::{create_dataloader_v1, load_file};
+use tiktoken_rs::r50k_base;
 
 mod embedding;
 mod file_operations;
@@ -18,8 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let drop_last = true;
     let context_length = 4;
     let vocab_size: i64 = 50267;
-    let output_dim: i64 = 256;
-    let device = Device::Cpu;
+    let output_dim: i64 = 3;
 
     let dataloader = create_dataloader_v1(
         &raw_text,
@@ -33,6 +33,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // only does one batch
     if let Some(batch_result) = dataloader.iter().next() {
         let (inputs, targets) = batch_result?;
+
+        let bpe = r50k_base().unwrap();
+
+        let new_text = "Your joueny starts with one step";
+
+        let tokens = bpe.encode_with_special_tokens(new_text);
+
+        println!("encode: {:?}", tokens);
 
         let input_vec: Vec<Vec<u32>> = inputs.to_vec2()?;
         let target_vec: Vec<Vec<u32>> = targets.to_vec2()?;

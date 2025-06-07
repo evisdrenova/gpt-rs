@@ -159,9 +159,9 @@ pub fn create_dataloader_v1(
     shuffle: bool,
     drop_last: bool,
 ) -> Result<DataLoader, Box<dyn std::error::Error>> {
-    let tokenizer = r50k_base()?;
+    let tokenizer: CoreBPE = r50k_base()?;
 
-    let dataset = GPTDataset::new(txt, &tokenizer, max_length, stride)?;
+    let dataset: GPTDataset = GPTDataset::new(txt, &tokenizer, max_length, stride)?;
 
     Ok(DataLoader::new(dataset, batch_size, shuffle, drop_last))
 }
