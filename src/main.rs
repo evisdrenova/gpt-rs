@@ -131,16 +131,53 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let query_tensor = query?;
 
-    let output = compute_intermediate_attention_scores(&inputs, &query_tensor)?;
+    let output = compute_attention_scores(&inputs, &query_tensor)?;
 
     println!("print the attention scores: {:?}", output);
+
+    let attn_weight_2 = softmax(&output)?;
+
+    println!("soft max norm: {:?}", softmax(&output)?);
+
+    let context_vector = compute_context_vector(&inputs, &attn_weight_2);
+
+    println!("the context vector: {:?}", context_vector);
 
     Ok(())
 }
 
-fn compute_intermediate_attention_scores(inputs: &Tensor, query: &Tensor) -> Result<Tensor, Error> {
+fn compute_attention_scores(inputs: &Tensor, query: &Tensor) -> Result<Tensor, Error> {
     let atten_scores = inputs.matmul(&query.unsqueeze(1)?)?;
     let attn_scores_flat = atten_scores.flatten_all()?;
 
     Ok(attn_scores_flat)
+}
+
+fn compute_context_vector(inputs: &Tensor, atten_weights: &Tensor) -> Result<Tensor, Error> {
+    //  sum over i of (atten_weights[i] * inputs[i])
+
+    // Reshape attention weights to [1, 6] for matrix multiplication
+    let weights_reshaped = atten_weights.unsqueeze(0)?; // [6] -> [1, 6]
+
+    // Matrix multiplication: [1, 6] × [6, 3] = [1, 3]
+    let context_matrix = weights_reshaped.matmul(inputs)?;
+
+    // Flatten to get [3] vector
+    let context_vector = context_matrix.flatten_all()?;
+    Ok(context_vector)
+}
+
+fn softmax(input: &Tensor) -> Result<Tensor, Error> {
+    // Softmax formula: softmax(x_i) = exp(x_i) / sum(exp(x_j) for all j)
+
+    // take the exponnent of each value
+    let exp_values = input.exp()?;
+
+    // sum all exp values
+    let exp_sum = exp_values.sum_all()?;
+
+    // use broadcast to handle shape differences and divide each exp value by the sum to normalize
+    let softmax_result = exp_values.broadcast_div(&exp_sum)?;
+
+    Ok(softmax_result)
 }

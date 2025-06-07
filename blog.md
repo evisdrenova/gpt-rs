@@ -829,10 +829,104 @@ The code is quite simple but powerful:
     Ok(())
 ```
 
-We're taking the dot product (matmul or element-wise matrix multiplication and sum) of the query tensor with the input tensor. When we run that we get:
+We're taking the dot product (matmul or element-wise matrix multiplication and sum) of the query tensor with the input tensor (really it's the vector within the tensor). When we run that we get:
 
 ```
 print the attention scores: Tensor[0.9544, 1.495, 1.4754, 0.8433999999999999, 0.7070000000000001, 1.0865; f64]
 ```
 
-THis is our attention score for the query at input[1].
+This is our attention score for the query at input[1].
+
+The dot product is a measure of how similar two vectors are. A higher dot product means there is higher similarity and attention score between two elements.
+
+### Normalizing attention scores
+
+Next we want to normalize our attention scores so that they sum to 1. This helps us get an idea of the weight of each attention score.
+
+To do this we just want to divide each element in our `attn_scores_flat` by the sum of the elements in that tensor so then we can sum up the entire tensor to 1. Like this:
+
+```rust
+    let query = inputs.get(1);
+
+    let query_tensor = query?;
+
+
+    let atten_scores = inputs.matmul(&query.unsqueeze(1)?)?;
+
+    let attn_scores_flat = atten_scores.flatten_all()?;
+
+    let atten_sum = attn_scores_flat.sum_all()?;
+
+    let atten_weights_2_temp = atten_scores.broadcast_div(&atten_sum)?;
+
+    let atten_unwrapped = atten_weights_2_temp;
+
+    println!("Attention weights: {:?}", atten_unwrapped);
+    println!("sum: {:?}", atten_unwrapped.sum_all());
+```
+
+And when we print that we get:
+
+```
+Attention weights: Tensor[0.145450112013655, 0.22783729826112137, 0.22485026746117623, 0.1285337641160065, 0.10774646814087814, 0.16558209000716279; f64]
+sum: Ok(Tensor[1; f64])
+```
+
+And our check at the end shows that it sums up to 1, nice!
+
+In reality, we would use something like a `softmax` to also handle negative numbers nicely. We can write a quick implementation of it:
+
+```rust
+fn softmax(input: &Tensor) -> Result<Tensor, Error> {
+    // Softmax formula: softmax(x_i) = exp(x_i) / sum(exp(x_j) for all j)
+
+    // take the exponnent of each value
+    let exp_values = input.exp()?;
+
+    // sum all exp values
+    let exp_sum = exp_values.sum_all()?;
+    println!("  Sum of exp values: {}", exp_sum);
+
+    // use broadcast to handle shape differences and divide each exp value by the sum to normalize
+    let softmax_result = exp_values.broadcast_div(&exp_sum)?;
+
+    Ok(softmax_result)
+}
+```
+
+This is just my own implementation that I did quickly and definitely has not been extensively tested for overflows and underflows.
+
+Okay, let's move onto the last part here which is creating the context vector. We do this by multiplying the embedded input tokens (x_i) by the corresponding attention weights and then summing the resulting vectors. So the context vector is a weighted sum of all input vectors obtained by multiplying each input vector by it's attention weight.
+
+Let's create a function to do this:
+
+```rust
+fn compute_context_vector(inputs: &Tensor, atten_weights: &Tensor) -> Result<Tensor, Error> {
+    //  sum over i of (atten_weights[i] * inputs[i])
+
+    // Reshape attention weights to [1, 6] for matrix multiplication
+    let weights_reshaped = atten_weights.unsqueeze(0)?; // [6] -> [1, 6]
+
+    // Matrix multiplication: [1, 6] × [6, 3] = [1, 3]
+    let context_matrix = weights_reshaped.matmul(inputs)?;
+
+    // Flatten to get [3] vector
+    let context_vector = context_matrix.flatten_all()?;
+    Ok(context_vector)
+}
+
+let attn_weight_2 = softmax(&output)?;
+
+let context_vector = compute_context_vector(&inputs, &attn_weight_2);
+
+```
+
+In this function, we're unsqueezing the normalized attention weights to get then into the vector shape we want with 6 dimensions. Then we run matmul on the reshaped normalized weights by taking the dot product with the input vector. Then we flatten the resulting tensor into a 1 dimension vector and return it.
+
+When we print it we get:
+
+```
+Ok(Tensor[0.4418657478512921, 0.651481978030222, 0.5683088877257294; f64])
+```
+
+Sweet! Things are looking up. Now we know how to calculate attention weights and context vectors for an individual token. Now we can expand this to do it for every token in our input.
