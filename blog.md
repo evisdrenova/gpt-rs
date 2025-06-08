@@ -991,9 +991,31 @@ Row 4: [0.4576, 0.707, 0.7154, 0.34739998, 0.66539997, 0.2935]
 Row 5: [0.63100004, 1.0865, 1.0605, 0.6565, 0.2935, 0.94500005]
 ```
 
-Notice that these aren't normalized. Let's do that step next. 
+Notice that these aren't normalized. Let's do that step next.
+
+Let's update the softmax function we wrote earlier to also take in a dimension argument so we can do row-wise softmax calculations. This means that each row will sum to 1 instead of a global softmax of all of the values in the tensor.
 
 ```rust
+    pub fn softmax(input: &Tensor, dim: Option<usize>) -> Result<Tensor, Error> {
+        // Softmax formula: softmax(x_i) = exp(x_i) / sum(exp(x_j) for all j)
 
+        // Apply exponential function element-wise
+        let exp_values = input.exp()?;
 
+        let softmax_result = match dim {
+            Some(dimension) => {
+                // Row-wise softmax
+                let exp_sum = exp_values.sum_keepdim(dimension)?;
+
+                exp_values.broadcast_div(&exp_sum)?
+            }
+            None => {
+                // Global softmax
+                let exp_sum = exp_values.sum_all()?;
+                exp_values.broadcast_div(&exp_sum)?
+            }
+        };
+
+        Ok(softmax_result)
+    }
 ```
