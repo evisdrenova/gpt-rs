@@ -161,7 +161,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Row {}: {:?}", i, row);
     }
 
-    let all_context_vectors = NeuralNet::compute_context_matrix(&inputs, &attn_weights_norm)?;
+    let all_context_vectors = NeuralNet::compute_context_vector(&inputs, &attn_weights_norm)?;
 
     println!("context vectors:");
     for i in 0..6 {

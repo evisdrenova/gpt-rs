@@ -29,7 +29,7 @@ impl NeuralNet {
     }
 
     // computes the context vector for a single query or index in an input
-    pub fn compute_context_vector(
+    pub fn compute_single_context_vector(
         inputs: &Tensor,
         attention_weights: &Tensor,
     ) -> Result<Tensor, Error> {
@@ -48,7 +48,7 @@ impl NeuralNet {
     }
 
     // computes context vector all queries at once or an entire input
-    pub fn compute_context_matrix(
+    pub fn compute_context_vector(
         inputs: &Tensor,
         attention_weights: &Tensor,
     ) -> Result<Tensor, Error> {

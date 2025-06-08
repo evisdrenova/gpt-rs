@@ -1019,3 +1019,56 @@ Let's update the softmax function we wrote earlier to also take in a dimension a
         Ok(softmax_result)
     }
 ```
+
+When we do that, we get:
+
+```
+Row 0: [0.20983475, 0.20058146, 0.19814923, 0.12422823, 0.12204873, 0.14515767]
+Row 1: [0.13854758, 0.23789133, 0.23327406, 0.12399159, 0.10818188, 0.15811361]
+Row 2: [0.13900758, 0.23692144, 0.23260193, 0.12420438, 0.110800184, 0.1564644]
+Row 3: [0.1435269, 0.20739442, 0.20455204, 0.14619222, 0.12629525, 0.17203921]
+Row 4: [0.15261084, 0.19583867, 0.19749062, 0.13668665, 0.1878589, 0.12951429]
+Row 5: [0.13847117, 0.21836372, 0.21275942, 0.14204758, 0.098806374, 0.18955176]
+```
+
+Now everything is normalized such that each row adds up to one. Nice!
+
+Okay last step now is to compute the context vectors for all of the inputs with the normalized attention weights.
+
+To do this, we can create a really simple function:
+
+```rust
+   pub fn compute_context_vector(
+        inputs: &Tensor,
+        attention_weights: &Tensor,
+    ) -> Result<Tensor, Error> {
+        let context_vectors = attention_weights.matmul(inputs)?;
+
+        Ok(context_vectors)
+    }
+```
+
+This just takes in the attention weights and performs matmul on the inputs as well. Notice that is simpler than our previous context vector function:
+
+```rust
+    // computes the context vector for a single query or index in an input
+    pub fn compute_single_context_vector(
+        inputs: &Tensor,
+        attention_weights: &Tensor,
+    ) -> Result<Tensor, Error> {
+        // Weighted sum: sum over i of (attention_weights[i] * inputs[i])
+
+        // Reshape attention weights from [seq_len] to [1, seq_len] for matrix multiplication
+        let weights_reshaped = attention_weights.unsqueeze(0)?;
+
+        // Matrix multiplication: [1, seq_len] × [seq_len, hidden_dim] = [1, hidden_dim]
+        let context_matrix = weights_reshaped.matmul(inputs)?;
+
+        // Flatten to get [hidden_dim] vector
+        let context_vector = context_matrix.flatten_all()?;
+
+        Ok(context_vector)
+    }
+```
+
+Since we're processing the entire input tensor we don't need to reshape the weights before and after the matmul as we did when our input was just a single query.
