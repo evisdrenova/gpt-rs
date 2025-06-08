@@ -930,3 +930,11 @@ Ok(Tensor[0.4418657478512921, 0.651481978030222, 0.5683088877257294; f64])
 ```
 
 Sweet! Things are looking up. Now we know how to calculate attention weights and context vectors for an individual token. Now we can expand this to do it for every token in our input.
+
+### Computing attention weights for all inputs
+
+Before we computed the attention weight for just input[2], now we can do it for all of the inputs.
+
+We'll want to iterate over each vector in the tensor and then over each element in the vector and calculate the context vector for each one.
+
+Essentially computing the attention score for every token in relation to every other token.

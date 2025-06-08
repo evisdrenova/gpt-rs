@@ -144,6 +144,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let context_vector = NeuralNet::compute_context_vector(&inputs, &attn_weight_2);
 
     println!("the context vector: {:?}", context_vector);
+    let inputs = inputs.to_dtype(candle_core::DType::F32)?;
+    let attn_scores = NeuralNet::compute_attention_scores_matrix(&inputs)?;
+
+    println!("Attention scores matrix:");
+    for i in 0..6 {
+        let row = attn_scores.get(i)?.to_vec1::<f32>()?;
+        println!("Row {}: {:?}", i, row);
+    }
 
     Ok(())
 }

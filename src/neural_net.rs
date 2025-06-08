@@ -11,6 +11,23 @@ impl NeuralNet {
         Ok(scores_flat)
     }
 
+    pub fn compute_attention_scores_matrix(inputs: &Tensor) -> Result<Tensor, Error> {
+        let seq_len = inputs.shape().dims()[0];
+        let mut scores_vec: Vec<f32> = Vec::new();
+        for i in 0..seq_len {
+            let x_i = inputs.get(i)?;
+            for j in 0..seq_len {
+                let x_j = inputs.get(j)?;
+                let dot_product = (&x_i * &x_j)?.sum_all()?.to_scalar::<f32>()?;
+
+                scores_vec.push(dot_product);
+            }
+        }
+
+        let attn_scores = Tensor::from_vec(scores_vec, (seq_len, seq_len), inputs.device())?;
+        Ok(attn_scores)
+    }
+
     pub fn compute_context_vector(
         inputs: &Tensor,
         attention_weights: &Tensor,
