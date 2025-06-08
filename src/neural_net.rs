@@ -28,6 +28,7 @@ impl NeuralNet {
         Ok(attn_scores)
     }
 
+    // computes the context vector for a single query or index in an input
     pub fn compute_context_vector(
         inputs: &Tensor,
         attention_weights: &Tensor,
@@ -44,6 +45,16 @@ impl NeuralNet {
         let context_vector = context_matrix.flatten_all()?;
 
         Ok(context_vector)
+    }
+
+    // computes context vector all queries at once or an entire input
+    pub fn compute_context_matrix(
+        inputs: &Tensor,
+        attention_weights: &Tensor,
+    ) -> Result<Tensor, Error> {
+        let context_vectors = attention_weights.matmul(inputs)?;
+
+        Ok(context_vectors)
     }
 
     pub fn softmax(input: &Tensor, dim: Option<usize>) -> Result<Tensor, Error> {
@@ -74,7 +85,7 @@ impl NeuralNet {
         Ok(softmax_result)
     }
 
-    pub fn attention(inputs: &Tensor, query: &Tensor) -> Result<(Tensor, Tensor), Error> {
+    pub fn compute_attention(inputs: &Tensor, query: &Tensor) -> Result<(Tensor, Tensor), Error> {
         // Step 1: Compute attention scores
         let scores = Self::compute_attention_scores(inputs, query)?;
 
