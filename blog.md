@@ -978,3 +978,15 @@ We could have used our previous `compute_attention_scores` function here instead
 Once we have the dot product, we push that into our vector and keep moving forward.
 
 Lastly, we convert our vector back to a Tensor. We could be more efficient in this function but honestly I think this is much clearer.
+
+Once we do all of that and print our attention matrix, we get:
+
+```
+Attention scores matrix:
+Row 0: [0.9994999, 0.95440006, 0.9422, 0.4753, 0.4576, 0.63100004]
+Row 1: [0.95440006, 1.4950001, 1.4754001, 0.8434, 0.707, 1.0865]
+Row 2: [0.9422, 1.4754001, 1.457, 0.8296, 0.7154, 1.0605]
+Row 3: [0.4753, 0.8434, 0.8296, 0.49369997, 0.34739998, 0.6565]
+Row 4: [0.4576, 0.707, 0.7154, 0.34739998, 0.66539997, 0.2935]
+Row 5: [0.63100004, 1.0865, 1.0605, 0.6565, 0.2935, 0.94500005]
+```
