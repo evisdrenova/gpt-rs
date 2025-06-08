@@ -938,3 +938,43 @@ Before we computed the attention weight for just input[2], now we can do it for 
 We'll want to iterate over each vector in the tensor and then over each element in the vector and calculate the context vector for each one.
 
 Essentially computing the attention score for every token in relation to every other token.
+
+Here is our function:
+
+```rust
+
+    let inputs = inputs.to_dtype(candle_core::DType::F32)?;
+    let attn_scores = NeuralNet::compute_attention_scores_matrix(&inputs)?;
+
+    pub fn compute_attention_scores_matrix(inputs: &Tensor) -> Result<Tensor, Error> {
+        let seq_len = inputs.shape().dims()[0];
+        let mut scores_vec: Vec<f32> = Vec::new();
+
+        for i in 0..seq_len {
+            let x_i = inputs.get(i)?;
+            for j in 0..seq_len {
+
+                let x_j = inputs.get(j)?;
+
+                let dot_product = (&x_i * &x_j)?.sum_all()?.to_scalar::<f32>()?;
+
+                scores_vec.push(dot_product);
+            }
+        }
+
+        let attn_scores = Tensor::from_vec(scores_vec, (seq_len, seq_len), inputs.device())?;
+        Ok(attn_scores)
+    }
+```
+
+First we convert the inputs from a float64 to float32 in order to do our matrix multiplication. THen we call our `compute_attention_scores_matrix` function.
+
+Then we initialize an empty vector to hold our attention weights (dot products). Then we iterate over every vector in the tensor and over every element in the vector and compute the dot product of that element with every other element.
+
+Since the shape of our tensor is [6,6] we'll have 36 total weights.
+
+We could have used our previous `compute_attention_scores` function here instead of calculating the raw dot product but I thought it was nice to shot it.
+
+Once we have the dot product, we push that into our vector and keep moving forward.
+
+Lastly, we convert our vector back to a Tensor. We could be more efficient in this function but honestly I think this is much clearer.
