@@ -46,17 +46,30 @@ impl NeuralNet {
         Ok(context_vector)
     }
 
-    pub fn softmax(input: &Tensor) -> Result<Tensor, Error> {
+    pub fn softmax(input: &Tensor, dim: Option<usize>) -> Result<Tensor, Error> {
         // Softmax formula: softmax(x_i) = exp(x_i) / sum(exp(x_j) for all j)
 
         // Apply exponential function element-wise
         let exp_values = input.exp()?;
 
-        // Sum all exponential values
-        let exp_sum = exp_values.sum_all()?;
+        let softmax_result = match dim {
+            Some(dimension) => {
+                // Row-wise (or dimension-wise) softmax
+                // Sum along the specified dimension while keeping dimensions
+                let exp_sum = exp_values.sum_keepdim(dimension)?; // Use 'dimension', not 'dim'
 
-        // Normalize: divide each exp value by the sum
-        let softmax_result = exp_values.broadcast_div(&exp_sum)?;
+                // Normalize: divide each element by the sum along that dimension
+                exp_values.broadcast_div(&exp_sum)?
+            }
+            None => {
+                // Global softmax (original behavior)
+                // Sum all exponential values
+                let exp_sum = exp_values.sum_all()?;
+
+                // Normalize: divide each exp value by the total sum
+                exp_values.broadcast_div(&exp_sum)?
+            }
+        };
 
         Ok(softmax_result)
     }
@@ -66,7 +79,7 @@ impl NeuralNet {
         let scores = Self::compute_attention_scores(inputs, query)?;
 
         // Step 2: Apply softmax to get attention weights
-        let weights = Self::softmax(&scores)?;
+        let weights = Self::softmax(&scores, Some(1))?;
 
         // Step 3: Compute context vector
         let context = Self::compute_context_vector(inputs, &weights)?;

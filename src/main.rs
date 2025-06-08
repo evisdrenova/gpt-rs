@@ -137,9 +137,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("print the attention scores: {:?}", output);
 
-    let attn_weight_2 = NeuralNet::softmax(&output)?;
+    let attn_weight_2 = NeuralNet::softmax(&output, None)?;
 
-    println!("soft max norm: {:?}", NeuralNet::softmax(&output)?);
+    println!("soft max norm: {:?}", NeuralNet::softmax(&output, None)?);
 
     let context_vector = NeuralNet::compute_context_vector(&inputs, &attn_weight_2);
 
@@ -150,6 +150,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Attention scores matrix:");
     for i in 0..6 {
         let row = attn_scores.get(i)?.to_vec1::<f32>()?;
+        println!("Row {}: {:?}", i, row);
+    }
+
+    let attn_weights_norm = NeuralNet::softmax(&attn_scores, Some(1))?;
+
+    println!("Attention weights norm:");
+    for i in 0..6 {
+        let row = attn_weights_norm.get(i)?.to_vec1::<f32>()?;
         println!("Row {}: {:?}", i, row);
     }
 
