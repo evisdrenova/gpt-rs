@@ -1,8 +1,81 @@
 use candle_core::{Device, Error, Tensor};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 
-pub struct NeuralNet {}
+pub struct NeuralNet {
+    pub w_query: Tensor,
+    pub w_key: Tensor,
+    pub w_value: Tensor,
+    pub d_in: usize,
+    pub d_out: usize,
+    pub device: Device,
+}
 
 impl NeuralNet {
+    pub fn new(
+        d_in: usize,
+        d_out: usize,
+        device: Device,
+        seed: Option<u64>,
+    ) -> Result<Self, Error> {
+        let mut rng = match seed {
+            Some(s) => StdRng::seed_from_u64(s),
+            None => StdRng::seed_from_u64(123), // default seed
+        };
+
+        // initialize with random weights between [0,1)
+        // aims to be equivalent to torch.rand
+        // we could prob parallelize this but then seeding gets weird since each thread gets their own RNG...
+        let n = d_in * d_out;
+
+        // fill vecs with
+        let mut wq: Vec<f32> = vec![0f32; n];
+        rng.fill(&mut wq[..]);
+
+        let mut wk: Vec<f32> = vec![0f32; n];
+        rng.fill(&mut wk[..]);
+
+        let mut wv: Vec<f32> = vec![0f32; n];
+        rng.fill(&mut wv[..]);
+
+        // turn vec -> tensor
+        let w_query = Tensor::from_vec(wq, (d_in, d_out), &device)?;
+        let w_key = Tensor::from_vec(wk, (d_in, d_out), &device)?;
+        let w_value = Tensor::from_vec(wv, (d_in, d_out), &device)?;
+        Ok(NeuralNet {
+            w_query,
+            w_key,
+            w_value,
+            d_in,
+            d_out,
+            device,
+        })
+    }
+
+    pub fn create_qkv_matrices(&self, inputs: &Tensor) -> Result<(Tensor, Tensor, Tensor), Error> {
+        let queries = inputs.matmul(&self.w_query)?;
+        let keys = inputs.matmul(&self.w_key)?;
+        let values = inputs.matmul(&self.w_value)?;
+
+        Ok((queries, keys, values))
+    }
+
+    pub fn get_weights(&self) -> (&Tensor, &Tensor, &Tensor) {
+        (&self.w_query, &self.w_key, &self.w_value)
+    }
+
+    // needs work and optimization - simple implementation for now
+    pub fn update_weights(
+        &mut self,
+        w_query: Tensor,
+        w_key: Tensor,
+        w_value: Tensor,
+    ) -> Result<(), Error> {
+        self.w_query = w_query;
+        self.w_key = w_key;
+        self.w_value = w_value;
+        Ok(())
+    }
+
     pub fn compute_attention_scores(inputs: &Tensor, query: &Tensor) -> Result<Tensor, Error> {
         // compute dot product
         let attention_scores = inputs.matmul(&query.unsqueeze(1)?)?;

@@ -125,8 +125,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let inputs: Tensor = Tensor::from_vec(data, (6, 3), &Device::Cpu)?;
 
     // Print the tensor
-    println!("Inputs tensor:");
-    println!("{}", inputs);
+    // println!("Inputs tensor:");
+    // println!("{}", inputs);
 
     // get the first index in the inputs tensor which is the tokenized word "journey"
     let query = inputs.get(1);
@@ -135,39 +135,53 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let output = NeuralNet::compute_attention_scores(&inputs, &query_tensor)?;
 
-    println!("print the attention scores: {:?}", output);
+    // println!("print the attention scores: {:?}", output);
 
     let attn_weight_2 = NeuralNet::softmax(&output, None)?;
 
-    println!("soft max norm: {:?}", NeuralNet::softmax(&output, None)?);
+    // println!("soft max norm: {:?}", NeuralNet::softmax(&output, None)?);
 
     let context_vector = NeuralNet::compute_context_matrix(&inputs, &attn_weight_2);
 
-    println!("the context vector: {:?}", context_vector);
+    // println!("the context vector: {:?}", context_vector);
     let inputs = inputs.to_dtype(candle_core::DType::F32)?;
     let attn_scores = NeuralNet::compute_attention_scores_matrix(&inputs)?;
 
-    println!("Attention scores matrix:");
-    for i in 0..6 {
-        let row = attn_scores.get(i)?.to_vec1::<f32>()?;
-        println!("Row {}: {:?}", i, row);
-    }
+    // println!("Attention scores matrix:");
+    // for i in 0..6 {
+    //     let row = attn_scores.get(i)?.to_vec1::<f32>()?;
+    //     println!("Row {}: {:?}", i, row);
+    // }
 
     let attn_weights_norm = NeuralNet::softmax(&attn_scores, Some(1))?;
 
-    println!("Attention weights norm:");
-    for i in 0..6 {
-        let row = attn_weights_norm.get(i)?.to_vec1::<f32>()?;
-        println!("Row {}: {:?}", i, row);
-    }
+    // println!("Attention weights norm:");
+    // for i in 0..6 {
+    //     let row = attn_weights_norm.get(i)?.to_vec1::<f32>()?;
+    //     println!("Row {}: {:?}", i, row);
+    // }
 
     let all_context_vectors = NeuralNet::compute_context_matrix(&inputs, &attn_weights_norm)?;
 
-    println!("context vectors:");
-    for i in 0..6 {
-        let row = all_context_vectors.get(i)?.to_vec1::<f32>()?;
-        println!("Row {}: {:?}", i, row);
-    }
+    // println!("context vectors:");
+    // for i in 0..6 {
+    //     let row = all_context_vectors.get(i)?.to_vec1::<f32>()?;
+    //     println!("Row {}: {:?}", i, row);
+    // }
 
+    // trainiable self-attention weights
+    let x_2 = inputs.get(1)?;
+    let d_in = 3; // input embedding size (3) 
+    let d_out = 2; // the output embedding size = (2)
+    let device = Device::Cpu;
+    let x_2_reshaped = x_2.unsqueeze(0)?;
+    let net = NeuralNet::new(d_in, d_out, device, Some(123))?;
+
+    // calc weight matrices
+    let (q, k, v) = NeuralNet::create_qkv_matrices(&net, &x_2_reshaped)?;
+
+    // should print -> tensor([0.4306, 1.4551])
+    println!("Query matrix (formatted):");
+    println!("{}", q);
     Ok(())
 }
