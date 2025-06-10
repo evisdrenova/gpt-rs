@@ -1072,3 +1072,103 @@ This just takes in the attention weights and performs matmul on the inputs as we
 ```
 
 Since we're processing the entire input tensor we don't need to reshape the weights before and after the matmul as we did when our input was just a single query.
+
+## Implementing self-attention with trainable weights
+
+in the previous step, we implemented simple attention mechanisms to calculate the context vector for one and many input tokens. In the next iteration of this, we want to be able to train the attention mechanism using backprop and gradient descent.
+
+In order to do that, we will create 3 weight matrices (w_q, w_k, w_v) that we will randomly initialize and then train.
+
+First, we have to update our `neural_net` impl to hold state!
+
+```rust
+pub struct NeuralNet {
+    pub w_query: Tensor,
+    pub w_key: Tensor,
+    pub w_value: Tensor,
+    pub d_in: usize, // the number of dimensions in the input
+    pub d_out: usize, // the number of dimensions in the outut
+    pub device: Device, // cpu vs. gpu
+}
+```
+
+We've added the three weight matrices to our struct so that we can update the weights as we train the model and added in a few other fields.
+
+We then need to be able to initialize our neural net. Which in this case represents a single attention head (for now).
+
+```rust
+    pub fn new(
+        d_in: usize,
+        d_out: usize,
+        device: Device,
+        seed: Option<u64>,
+    ) -> Result<Self, Error> {
+        let mut rng = match seed {
+            Some(s) => StdRng::seed_from_u64(s),
+            None => StdRng::seed_from_u64(123), // default seed
+        };
+
+        // initialize with random weights between [0,1)
+        // aims to be equivalent to torch.rand
+        // we could prob parallelize this but then seeding gets weird since each thread gets their own RNG...
+        let n = d_in * d_out;
+
+        // fill vecs with
+        let mut wq: Vec<f32> = vec![0f32; n];
+        rng.fill(&mut wq[..]);
+
+        let mut wk: Vec<f32> = vec![0f32; n];
+        rng.fill(&mut wk[..]);
+
+        let mut wv: Vec<f32> = vec![0f32; n];
+        rng.fill(&mut wv[..]);
+
+        // turn vec -> tensor
+        let w_query = Tensor::from_vec(wq, (d_in, d_out), &device)?;
+        let w_key = Tensor::from_vec(wk, (d_in, d_out), &device)?;
+        let w_value = Tensor::from_vec(wv, (d_in, d_out), &device)?;
+        Ok(NeuralNet {
+            w_query,
+            w_key,
+            w_value,
+            d_in,
+            d_out,
+            device,
+        })
+    }
+```
+
+First, we init a random number generator and check if the user provided a seed. Then we calculate the size of vector we need to fill by multiplying the dims and initializing 3 vectors, one for each of our weight matrices. Next, we fill those vectors with random values from our rng and then lastly convert the vector to a tensor with the right shape.
+
+There are few more functions we need to create.
+
+```rust
+  pub fn create_qkv_matrices(&self, inputs: &Tensor) -> Result<(Tensor, Tensor, Tensor), Error> {
+        let queries = inputs.matmul(&self.w_query)?;
+        let keys = inputs.matmul(&self.w_key)?;
+        let values = inputs.matmul(&self.w_value)?;
+
+        Ok((queries, keys, values))
+    }
+
+    pub fn get_weights(&self) -> (&Tensor, &Tensor, &Tensor) {
+        (&self.w_query, &self.w_key, &self.w_value)
+    }
+
+    // needs work and optimization - simple implementation for now
+    pub fn update_weights(
+        &mut self,
+        w_query: Tensor,
+        w_key: Tensor,
+        w_value: Tensor,
+    ) -> Result<(), Error> {
+        self.w_query = w_query;
+        self.w_key = w_key;
+        self.w_value = w_value;
+        Ok(())
+    }
+```
+
+First, is using `matmul` to calculate the weight matrices by taking the dot product of the input tensor and with the weight matrix. We will iteratively refine this as we train it.
+
+Then we create a getter and updater function to get the weights and update the weights. Nice little helper funcs.
