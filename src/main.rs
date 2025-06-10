@@ -177,10 +177,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let x_2_reshaped = x_2.unsqueeze(0)?;
     let net = NeuralNet::new(d_in, d_out, device, Some(123))?;
 
+    println!("q tens {}", net.w_query);
     // calc weight matrices
     let (q, k, v) = NeuralNet::create_qkv_matrices(&net, &x_2_reshaped)?;
 
-    // should print -> tensor([0.4306, 1.4551])
+    // should print
     println!("Query matrix (formatted):");
     println!("{}", q);
     Ok(())
