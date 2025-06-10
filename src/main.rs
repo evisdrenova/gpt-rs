@@ -141,7 +141,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("soft max norm: {:?}", NeuralNet::softmax(&output, None)?);
 
-    let context_vector = NeuralNet::compute_context_vector(&inputs, &attn_weight_2);
+    let context_vector = NeuralNet::compute_context_matrix(&inputs, &attn_weight_2);
 
     println!("the context vector: {:?}", context_vector);
     let inputs = inputs.to_dtype(candle_core::DType::F32)?;
@@ -161,7 +161,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Row {}: {:?}", i, row);
     }
 
-    let all_context_vectors = NeuralNet::compute_context_vector(&inputs, &attn_weights_norm)?;
+    let all_context_vectors = NeuralNet::compute_context_matrix(&inputs, &attn_weights_norm)?;
 
     println!("context vectors:");
     for i in 0..6 {

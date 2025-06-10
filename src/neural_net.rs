@@ -48,7 +48,7 @@ impl NeuralNet {
     }
 
     // computes context vector all queries at once or an entire input
-    pub fn compute_context_vector(
+    pub fn compute_context_matrix(
         inputs: &Tensor,
         attention_weights: &Tensor,
     ) -> Result<Tensor, Error> {
@@ -93,7 +93,7 @@ impl NeuralNet {
         let weights = Self::softmax(&scores, Some(1))?;
 
         // Step 3: Compute context vector
-        let context = Self::compute_context_vector(inputs, &weights)?;
+        let context = Self::compute_context_matrix(inputs, &weights)?;
 
         Ok((weights, context))
     }
