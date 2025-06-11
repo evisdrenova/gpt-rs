@@ -209,5 +209,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let attn_weights_2 = NeuralNet::softmax(&scaled_scores, Some(1))?;
 
     println!("attn_weights_2: {}", attn_weights_2);
+
+    // calculate the context vector for a single input token
+    let context_vec_2 = attn_weights_2.matmul(&v)?;
+    println!("context_vec_2: {}", context_vec_2);
     Ok(())
 }

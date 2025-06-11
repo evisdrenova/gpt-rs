@@ -1358,3 +1358,38 @@ teh scale factor 0.70710677
 attn_weights_2: [[0.2110, 0.2282, 0.2237, 0.1036, 0.0999, 0.1336]]
 Tensor[[1, 6], f32]
 ```
+
+Lastly, we can calculate the context vector! here we compute the context vector as a weighted sum over the input vectors by multiplying each value vector with ti's respective attention weight and then summing over them to obtain the context vector.
+
+```rust
+    // calculate the context vector for a single input token
+    let context_vec_2 = attn_weights_2.matmul(&v)?;
+        println!("context_vec_2: {}", context_vec_2);
+```
+
+When we run that we get:
+
+```
+context_vec_2: [[1.3111, 0.5699]]
+Tensor[[1, 2], f32]
+```
+
+Nice! we calculated (kinda painfully and manually), for a single input token, the context vector which tells the model the relevancy of the other tokens in the sentence.
+
+The terms “key,” “query,” and “value” in the context of attention mechanisms are
+borrowed from the domain of information retrieval and databases, where similar concepts
+are used to store, search, and retrieve information.
+
+A query is analogous to a search query in a database. It represents the current item
+(e.g., a word or token in a sentence) the model focuses on or tries to understand.
+The query is used to probe the other parts of the input sequence to determine how
+much attention to pay to them.
+
+The key is like a database key used for indexing and searching. In the attention mechanism,
+each item in the input sequence (e.g., each word in a sentence) has an associated
+key. These keys are used to match the query.
+
+The value in this context is similar to the value in a key-value pair in a database. It
+represents the actual content or representation of the input items. Once the model
+determines which keys (and thus which parts of the input) are most relevant to the
+query (the current focus item), it retrieves the corresponding values.
