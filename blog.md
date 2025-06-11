@@ -1322,3 +1322,39 @@ Now let's do generalize it for the entire input:
 ```
 
 The main change we made here was add in `matmul` of the query tensor with the transposed key matrix to get our attention score for the entire input.
+
+When we run this we can check that the second element in the vector is the same as we calculated above.
+
+```
+attn_score_22: [2.2875]
+atten_score_all: [[2.1768, 2.2875, 2.2594, 1.1707, 1.1189, 1.5305]]
+```
+
+Nice!
+
+Now we want to go from the attention scores to the attention weights. We can do that by taking the square root of the embedding dimension of the keys and then applying a softmax to normalize the value between 0 -> 1:
+
+```rust
+    let d_k = k.shape().dims()[1];
+
+    let scale = 1.0 / (d_k as f32).sqrt();
+    let scaled_scores = atten_score_all.affine(scale as f64, 0.0)?;
+    let attn_weights_2 = NeuralNet::softmax(&scaled_scores, Some(1))?;
+
+    println!("attn_weights_2: {}", attn_weights_2);
+```
+
+First, we're getting the second dimension in the tensor `d_k` and then in the next line calculating a scaling factor to apply to each of our weights in the attention vector. Then we apply the scale to the `atten_score_all` vector and then apply a row-wise softmax over the vector to get probability distributions.
+
+This is our output:
+
+```rust
+attn_score_22: [2.2875]
+Tensor[[], f32]
+k_transpose shape: [2, 6]
+atten_score_all: [[2.1768, 2.2875, 2.2594, 1.1707, 1.1189, 1.5305]]
+Tensor[[1, 6], f32]
+teh scale factor 0.70710677
+attn_weights_2: [[0.2110, 0.2282, 0.2237, 0.1036, 0.0999, 0.1336]]
+Tensor[[1, 6], f32]
+```

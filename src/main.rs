@@ -200,5 +200,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let atten_score_all = query_2_reshaped.matmul(&k_transpose)?;
     println!("atten_score_all: {}", atten_score_all);
 
+    let d = k.shape().dims().last().unwrap();
+    let d_k = k.shape().dims()[1];
+
+    let scale = 1.0 / (d_k as f32).sqrt();
+    println!("teh scale factor {}", scale);
+    let scaled_scores = atten_score_all.affine(scale as f64, 0.0)?;
+    let attn_weights_2 = NeuralNet::softmax(&scaled_scores, Some(1))?;
+
+    println!("attn_weights_2: {}", attn_weights_2);
     Ok(())
 }
