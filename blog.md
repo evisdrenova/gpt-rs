@@ -1240,6 +1240,10 @@ python# W_value learns: "When you DO pay attention to me, extract THIS informati
 value = input @ W_value  # Transforms input into "what info I provide"
 ```
 
+So the weight matrices teach the model HOW to compute attention, while the attention weights show WHERE the model is focusing for that specific input
+
+It's worth reading and re-reading this until it's clear.
+
 In order to calculate the key and value tensors, we can simply just pass in the entire input to the `create_qkv_matrices()` instead of just the second token.
 
 ```rust
@@ -1278,3 +1282,43 @@ Tensor[[6, 2], f32]
 ```
 
 You can see that our tensor now has 6 vectors and 2 elements in each vector, so we've successfully projected the six input tokens from a 3 dimensional onto a 2 dimensional embedding space.
+
+Next, we want to compute the attention scores. The unscaled attention score is computed as a dot product between the query and key vectors.
+
+Here's how we can do this:
+
+```rust
+    let (q, k, v) = NeuralNet::create_qkv_matrices(&net, &inputs)?;
+
+    let query_2 = q.get(1)?; // [2] - query for token 2
+    let keys_2 = k.get(1)?;
+
+    let atten_score_22 = (query_2 * keys_2)?.sum_all()?;
+    println!("attn_score_22: {}", atten_score_22);
+
+    Ok(())
+```
+
+Note that here were calculating the dot product of the second element in query_2 with the second element in key_2 tensor and **not** matrix multiplying them.
+
+Remember that matrix multiplication outputs a matrix while dot products output a scalar.
+
+When we print that we get:
+
+`attn_score_22: [2.2875]`
+
+Now let's do generalize it for the entire input:
+
+```rust
+    let query_2 = q.get(1)?;
+    let keys_2 = k.get(1)?;
+
+    let k_transpose = k.transpose(0, 1)?;
+    println!("k_transpose shape: {:?}", k_transpose.shape());
+
+    let query_2_reshaped = query_2.unsqueeze(0)?;
+    let atten_score_all = query_2_reshaped.matmul(&k_transpose)?;
+    println!("atten_score_all: {}", atten_score_all);
+```
+
+The main change we made here was add in `matmul` of the query tensor with the transposed key matrix to get our attention score for the entire input.

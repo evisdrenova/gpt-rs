@@ -177,14 +177,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let x_2_reshaped = x_2.unsqueeze(0)?;
     let net = NeuralNet::new(d_in, d_out, device, Some(123))?;
 
-    println!("q tens {}", net.w_query);
     // calc weight matrices
     let (q, k, v) = NeuralNet::create_qkv_matrices(&net, &inputs)?;
 
-    // should print
-    println!("Query matrix (formatted):");
     println!("q {}", q);
     println!("k {}", k);
     println!("v {}", v);
+
+    let query_2 = q.get(1)?;
+    let keys_2 = k.get(1)?;
+
+    println!("query_2 shape: {:?}", query_2.shape());
+    println!("keys_2 shape: {:?}", keys_2.shape());
+
+    let atten_score_22 = (query_2.clone() * keys_2)?.sum_all()?;
+    println!("attn_score_22: {}", atten_score_22);
+
+    let k_transpose = k.transpose(0, 1)?;
+    println!("k_transpose shape: {:?}", k_transpose.shape());
+
+    let query_2_reshaped = query_2.unsqueeze(0)?;
+    let atten_score_all = query_2_reshaped.matmul(&k_transpose)?;
+    println!("atten_score_all: {}", atten_score_all);
+
     Ok(())
 }
