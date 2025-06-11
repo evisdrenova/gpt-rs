@@ -1172,3 +1172,109 @@ There are few more functions we need to create.
 First, is using `matmul` to calculate the weight matrices by taking the dot product of the input tensor and with the weight matrix. We will iteratively refine this as we train it.
 
 Then we create a getter and updater function to get the weights and update the weights. Nice little helper funcs.
+
+Okay, now let's run it for the query weight matrix:
+
+```rust
+ let x_2 = inputs.get(1)?;
+    let d_in = 3; // in a real run these would be the same
+    let d_out = 2; // in a real run these would be the same
+    let device = Device::Cpu;
+    let x_2_reshaped = x_2.unsqueeze(0)?;
+    let net = NeuralNet::new(d_in, d_out, device, Some(123))?; // setting a seed
+
+    println!("q tensor {}", net.w_query);
+    // calc weight matrices
+    let (q, k, v) = NeuralNet::create_qkv_matrices(&net, &x_2_reshaped)?;
+
+    // should print
+    println!("Query matrix (formatted):");
+    println!("{}", q);
+    Ok(())
+```
+
+Our output is:
+
+```
+q tensor [[0.9835, 0.1733],
+ [0.7341, 0.1523],
+ [0.1335, 0.9307]]
+Tensor[[3, 2], f32]
+Query matrix (formatted):
+[[1.2677, 0.8420]]
+```
+
+Above we can see that we have our query tensor printed, which was initialized with the random weights. Then we can see the query matrix which is a matmul of the input tensor (`x_2`) and the initialized query weight matrix.
+
+One thing to clarify here, attention weights are different from weight matrices (w_q, w_k, w_v). Attention weights determine the extent to which a a context vector depends on different parts to the input or "attends to" while weight matrices which contain weight parameters that are optimized during trained.
+
+Attention weights are **not** trainable and are calculated dynamically while weight matrices are trainable. The weight matrices don't directly compute attention - they prepare the inputs so that when you do the dot product Q @ K^T, the attention scores will be meaningful.
+
+**key**: Weight matrices teach the model how to compute attention and what to focus on, while the attention weights show where the model is focusing.
+
+Another breakdown
+
+```
+# W_query learns: "When looking for information, focus on THESE features"
+# Example: W_query might learn to emphasize:
+# - Verbs when processing subjects (to find what they do)
+# - Question words when processing answers
+# - Emotional words when processing sentiment
+
+query = input @ W_query  # Transforms raw input into "what I'm looking for"
+2. What Makes a Good Key?
+python# W_key learns: "These features make a token WORTH paying attention to"
+# Example: W_key might learn that tokens are important when they:
+# - Are nouns (for entity extraction)
+# - Are at sentence boundaries (for structure)
+# - Have certain semantic properties
+
+key = input @ W_key  # Transforms input into "how important am I?"
+3. What Information to Extract?
+python# W_value learns: "When you DO pay attention to me, extract THIS information"
+# Example: W_value might learn to extract:
+# - Semantic meaning (ignoring position)
+# - Syntactic role (noun, verb, etc.)
+# - Contextual relationships
+
+value = input @ W_value  # Transforms input into "what info I provide"
+```
+
+In order to calculate the key and value tensors, we can simply just pass in the entire input to the `create_qkv_matrices()` instead of just the second token.
+
+```rust
+// before
+  let (q, k, v) = NeuralNet::create_qkv_matrices(&net, &x_2_reshaped)?;
+
+// after
+  let (q, k, v) = NeuralNet::create_qkv_matrices(&net, &inputs)?
+```
+
+That will print out:
+
+```
+Query matrix (formatted):
+q [[0.6518, 0.9256],
+ [1.2677, 0.8420],
+ [1.2700, 0.8238],
+ [0.6862, 0.4336],
+ [0.9542, 0.2645],
+ [0.7098, 0.6424]]
+Tensor[[6, 2], f32]
+k [[0.9493, 1.1560],
+ [0.8453, 1.4441],
+ [0.8394, 1.4196],
+ [0.3967, 0.7931],
+ [0.4975, 0.5798],
+ [0.4882, 1.0827]]
+Tensor[[6, 2], f32]
+v [[1.0407, 0.6717],
+ [1.6730, 0.6707],
+ [1.6522, 0.6616],
+ [0.9450, 0.3403],
+ [0.8119, 0.3125],
+ [1.2062, 0.4540]]
+Tensor[[6, 2], f32]
+```
+
+You can see that our tensor now has 6 vectors and 2 elements in each vector, so we've successfully projected the six input tokens from a 3 dimensional onto a 2 dimensional embedding space.

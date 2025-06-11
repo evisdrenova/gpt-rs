@@ -179,10 +179,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("q tens {}", net.w_query);
     // calc weight matrices
-    let (q, k, v) = NeuralNet::create_qkv_matrices(&net, &x_2_reshaped)?;
+    let (q, k, v) = NeuralNet::create_qkv_matrices(&net, &inputs)?;
 
     // should print
     println!("Query matrix (formatted):");
-    println!("{}", q);
+    println!("q {}", q);
+    println!("k {}", k);
+    println!("v {}", v);
     Ok(())
 }
