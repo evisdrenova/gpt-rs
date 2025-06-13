@@ -1393,3 +1393,30 @@ The value in this context is similar to the value in a key-value pair in a datab
 represents the actual content or representation of the input items. Once the model
 determines which keys (and thus which parts of the input) are most relevant to the
 query (the current focus item), it retrieves the corresponding values.
+
+Now we can bring it all together with our forward method to calcualte the attention weights:
+
+```rust
+    pub fn forward(&self, input: &Tensor) -> Result<Tensor, Error> {
+        let keys = input.matmul(&self.w_key)?;
+        let queries = input.matmul(&self.w_query)?;
+        let values = input.matmul(&self.w_value)?;
+
+        let keys_t = keys.t()?;
+
+        let attn_scores = queries.matmul(&keys_t)?;
+
+        let d_k = keys.dim(keys.rank() - 1)? as f64;
+        let scale = 1.0 / d_k.sqrt();
+
+        let scaled_scores = (attn_scores * scale)?;
+
+        let attn_weights = NeuralNet::softmax(&scaled_scores, Some(scaled_scores.rank() - 1))?;
+
+        let context_vecs = attn_weights.matmul(&values)?;
+
+        Ok(context_vecs)
+    }
+```
+
+.

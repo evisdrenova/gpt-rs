@@ -1,6 +1,6 @@
 # Introduction
 
-\*\* !REPO is a Work-in-Progress! &&
+\*\* !REPO is a Work-in-Progress! \*\*
 
 GPT-RS aims to be a llama.cpp equivalent in rust with better developer ergonomics and portability.
 
