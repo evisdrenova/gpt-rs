@@ -8,6 +8,7 @@ pub struct NeuralNet {
     pub d_in: usize,
     pub d_out: usize,
     pub device: Device,
+    pub bias: bool,
 }
 
 impl NeuralNet {
@@ -16,6 +17,7 @@ impl NeuralNet {
         d_out: usize,
         device: Device,
         seed: Option<u64>,
+        bias: Option<bool>,
     ) -> Result<Self, Error> {
         let mut rng = match seed {
             Some(s) => StdRng::seed_from_u64(s),
@@ -37,10 +39,13 @@ impl NeuralNet {
         let mut wv: Vec<f32> = vec![0f32; n];
         rng.fill(&mut wv[..]);
 
+        let bias = bias.unwrap_or(false);
+
         // turn vec -> tensor
         let w_query = Tensor::from_vec(wq, (d_in, d_out), &device)?;
         let w_key = Tensor::from_vec(wk, (d_in, d_out), &device)?;
         let w_value = Tensor::from_vec(wv, (d_in, d_out), &device)?;
+
         Ok(NeuralNet {
             w_query,
             w_key,
@@ -48,6 +53,7 @@ impl NeuralNet {
             d_in,
             d_out,
             device,
+            bias,
         })
     }
 
@@ -191,4 +197,8 @@ impl NeuralNet {
 
         Ok(context_vecs)
     }
+}
+
+pub struct Linear {
+    //todo
 }
