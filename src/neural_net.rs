@@ -170,4 +170,25 @@ impl NeuralNet {
 
         Ok((weights, context))
     }
+
+    pub fn forward(&self, input: &Tensor) -> Result<Tensor, Error> {
+        let keys = input.matmul(&self.w_key)?;
+        let queries = input.matmul(&self.w_query)?;
+        let values = input.matmul(&self.w_value)?;
+
+        let keys_t = keys.t()?;
+
+        let attn_scores = queries.matmul(&keys_t)?;
+
+        let d_k = keys.dim(keys.rank() - 1)? as f64;
+        let scale = 1.0 / d_k.sqrt();
+
+        let scaled_scores = (attn_scores * scale)?;
+
+        let attn_weights = NeuralNet::softmax(&scaled_scores, Some(scaled_scores.rank() - 1))?;
+
+        let context_vecs = attn_weights.matmul(&values)?;
+
+        Ok(context_vecs)
+    }
 }
