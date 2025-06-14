@@ -200,5 +200,42 @@ impl NeuralNet {
 }
 
 pub struct Linear {
-    //todo
+    pub weight: Tensor,
+    pub bias: Option<Tensor>,
+    pub in_features: usize,
+    pub out_features: usize,
+}
+/// Applies an affine linear transformation to the incoming data: y = xA^T + b, where  x is the input tensor, A is a randomly intialized weight matrix and b is a bias term
+/// * `in_features` - Size of input features
+/// * `out_features` - Size of output features  
+/// * `bias` - Whether to include bias term
+/// * `device` - Device to create tensors on
+/// * `seed` - Optional seed for reproducible initialization
+impl Linear {
+    pub fn new(
+        in_features: usize,
+        out_features: usize,
+        bias: bool,
+        device: &Device,
+        seed: Option<u64>,
+    ) -> Result<Self> {
+        let mut rng = match seed {
+            Some(s) => StdRng::seed_from_u64(s),
+            None => StdRng::seed_from_u64(123), // no seed
+        };
+
+        //iniitliaze an empty tensor
+        // in pytorch: self.bias = Parameter(torch.empty(out_features, **factory_kwargs))
+
+        //affine transformation
+
+        // todo ..
+
+        Ok(Linear {
+            weight,
+            bias,
+            in_features,
+            out_features,
+        })
+    }
 }
