@@ -1432,3 +1432,72 @@ Previously, if we were computing the attention scores for the `dog` token then w
 Now, we will only calculate attention scores for the `The dog` tokens.
 
 One way to do this is to calculate the attention scores, apply a softmax and normalize the scores (rows sum to 1), mask attention scores, then renormalize since we now have zero'd out some of the values in the rows.
+
+Here's how we can do that:
+
+```rust
+    pub fn tril(size: usize, device: &Device) -> Result<Tensor, Error> {
+        let mut mask_data = Vec::with_capacity(size * size);
+
+        for row in 0..size {
+            for col in 0..size {
+                if col <= row {
+                    mask_data.push(1.0f32);
+                } else {
+                    mask_data.push(0.0f32);
+                }
+            }
+        }
+
+        Tensor::from_vec(mask_data, (size, size), device)
+    }
+```
+
+This is a basic mask function which creates a Tensor of cascading zeros in a in a Tensor of 1s. Such as:
+
+```rust
+[[1., 0., 0., 0., 0., 0.],
+ [1., 1., 0., 0., 0., 0.],
+ [1., 1., 1., 0., 0., 0.],
+ [1., 1., 1., 1., 0., 0.],
+ [1., 1., 1., 1., 1., 0.],
+ [1., 1., 1., 1., 1., 1.]]
+```
+
+You can see the triangular shape of the zeros in the Tensor.
+
+Then we can apply that to our attention weights to mask out the tokens in each vector.
+
+```rust
+    let context_length = attn_scores.shape().dims()[0];
+    let mask = NeuralNet::tril(context_length, attn_scores.device())?;
+    let masked_weights = attn_weights.broadcast_mul(&mask)?;
+```
+
+First, we get the context length from the calculated attention scores. Then we create and apply the mask.
+
+Ultimately, we'll get something like:
+
+```bash
+attn_weights_2: [[0.1927, 0.1492, 0.1497, 0.1703, 0.1753, 0.1628],
+ [0.1972, 0.1515, 0.1520, 0.1659, 0.1741, 0.1593],
+ [0.1947, 0.1533, 0.1538, 0.1654, 0.1732, 0.1596],
+ [0.1880, 0.1547, 0.1551, 0.1674, 0.1726, 0.1622],
+ [0.1460, 0.1912, 0.1905, 0.1546, 0.1542, 0.1634],
+ [0.2130, 0.1372, 0.1380, 0.1718, 0.1808, 0.1591]]
+Tensor[[6, 6], f32]
+mask: [[1., 0., 0., 0., 0., 0.],
+ [1., 1., 0., 0., 0., 0.],
+ [1., 1., 1., 0., 0., 0.],
+ [1., 1., 1., 1., 0., 0.],
+ [1., 1., 1., 1., 1., 0.],
+ [1., 1., 1., 1., 1., 1.]]
+Tensor[[6, 6], f32]
+masked_scores: [[0.1927, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+ [0.1972, 0.1515, 0.0000, 0.0000, 0.0000, 0.0000],
+ [0.1947, 0.1533, 0.1538, 0.0000, 0.0000, 0.0000],
+ [0.1880, 0.1547, 0.1551, 0.1674, 0.0000, 0.0000],
+ [0.1460, 0.1912, 0.1905, 0.1546, 0.1542, 0.0000],
+ [0.2130, 0.1372, 0.1380, 0.1718, 0.1808, 0.1591]]
+Tensor[[6, 6], f32]
+```
