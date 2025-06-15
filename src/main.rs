@@ -232,11 +232,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let context_length = attn_scores.shape().dims()[0];
     let mask = NeuralNet::tril(context_length, attn_scores.device())?;
 
-    let neg_inf = -1e9f64;
-    let mask_neg_inf = (mask - 1.0)? * neg_inf;
-    let masked_scores = (attn_scores + mask_neg_inf)?;
+    println!("mask: {}", mask);
 
-    println!("masked_scores: {}", masked_scores);
+    let masked_weights = attn_weights.broadcast_mul(&mask)?;
+
+    println!("masked_scores: {}", masked_weights);
 
     Ok(())
 }
