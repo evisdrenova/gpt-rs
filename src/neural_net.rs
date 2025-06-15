@@ -255,4 +255,32 @@ impl Linear {
             out_features,
         })
     }
+
+    pub fn forward(&self, input: &Tensor) -> Result<Tensor, Error> {
+        let input_shape = input.dims();
+
+        if input_shape.is_empty() {
+            return Err(Error::Msg("Input tensor cannot be empty".into()));
+        }
+
+        let last_dim = input_shape[input_shape.len() - 1];
+        if last_dim != self.in_features {
+            return Err(Error::Msg(
+                format!(
+                    "Input last dimension {} doesn't match in_features {}",
+                    last_dim, self.in_features
+                )
+                .into(),
+            ));
+        }
+
+        // do forward pass by matmul the input tensor with the weight tensor
+        let output = input.matmul(&self.weight)?;
+
+        // Add bias if present
+        match &self.bias {
+            Some(bias) => output.broadcast_add(bias),
+            None => Ok(output),
+        }
+    }
 }
