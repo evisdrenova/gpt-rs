@@ -1419,4 +1419,14 @@ Now we can bring it all together with our forward method to calcualte the attent
     }
 ```
 
-.
+## Causal Attention
+
+For many LLM tasks, you want the self-attention mechanism to only consider the tokens that appear prior to the current position of the token you're predicating and nothing else. This is **masked attention** because we will restrict the model to only consider previous and current inputs in a sequence when computing attention scores as opposed to the entire input sequence.
+
+So if the input sequence is:
+
+`The dog ran from the car`
+
+Previously, if we were computing the attention scores for the `dog` token then we would calculate teh attention scores and context vectors for every token in the input with a reference to the `dog` token.
+
+Now, we will only calculate attention scores for the `The dog` tokens.
