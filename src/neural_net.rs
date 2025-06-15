@@ -218,18 +218,35 @@ impl Linear {
         bias: bool,
         device: &Device,
         seed: Option<u64>,
-    ) -> Result<Self> {
+    ) -> Result<Self, Error> {
         let mut rng = match seed {
             Some(s) => StdRng::seed_from_u64(s),
             None => StdRng::seed_from_u64(123), // no seed
         };
 
-        //iniitliaze an empty tensor
-        // in pytorch: self.bias = Parameter(torch.empty(out_features, **factory_kwargs))
+        // Glorot uniform initialization to maintain variance across forward/backward prop
+        // Standard deviation = sqrt(2.0 / (in_features + out_features))
+        let std_dev = (2.0 / (in_features + out_features) as f64).sqrt() as f32;
+        let bound = std_dev * (3.0_f32).sqrt();
 
-        //affine transformation
+        let weight_size = in_features * out_features;
 
-        // todo ..
+        let mut weight_data: Vec<f32> = Vec::with_capacity(weight_size);
+        for _ in 0..weight_size {
+            weight_data.push(rng.random_range(-bound..bound));
+        }
+
+        let weight = Tensor::from_vec(weight_data, weight_size, device)?;
+
+        let bias = if bias {
+            Some(Tensor::zeros(
+                out_features,
+                candle_core::DType::F32,
+                device,
+            )?)
+        } else {
+            None
+        };
 
         Ok(Linear {
             weight,
