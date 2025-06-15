@@ -2,9 +2,9 @@ use candle_core::{Device, Error, Tensor};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
 pub struct NeuralNet {
-    pub w_query: Tensor,
-    pub w_key: Tensor,
-    pub w_value: Tensor,
+    pub w_query: Linear,
+    pub w_key: Linear,
+    pub w_value: Linear,
     pub d_in: usize,
     pub d_out: usize,
     pub device: Device,
@@ -19,32 +19,12 @@ impl NeuralNet {
         seed: Option<u64>,
         bias: Option<bool>,
     ) -> Result<Self, Error> {
-        let mut rng = match seed {
-            Some(s) => StdRng::seed_from_u64(s),
-            None => StdRng::seed_from_u64(123), // default seed
-        };
-
-        // initialize with random weights between [0,1)
-        // aims to be equivalent to torch.rand
-        // we could prob parallelize this but then seeding gets weird since each thread gets their own RNG...
-        let n = d_in * d_out;
-
-        // fill vecs with
-        let mut wq: Vec<f32> = vec![0f32; n];
-        rng.fill(&mut wq[..]);
-
-        let mut wk: Vec<f32> = vec![0f32; n];
-        rng.fill(&mut wk[..]);
-
-        let mut wv: Vec<f32> = vec![0f32; n];
-        rng.fill(&mut wv[..]);
-
         let bias = bias.unwrap_or(false);
 
-        // turn vec -> tensor
-        let w_query = Tensor::from_vec(wq, (d_in, d_out), &device)?;
-        let w_key = Tensor::from_vec(wk, (d_in, d_out), &device)?;
-        let w_value = Tensor::from_vec(wv, (d_in, d_out), &device)?;
+        // create linear layers
+        let w_query = Linear::new(d_in, d_out, bias, &device, seed)?;
+        let w_key = Linear::new(d_in, d_out, bias, &device, seed)?;
+        let w_value = Linear::new(d_in, d_out, bias, &device, seed)?;
 
         Ok(NeuralNet {
             w_query,
@@ -58,23 +38,28 @@ impl NeuralNet {
     }
 
     pub fn create_qkv_matrices(&self, inputs: &Tensor) -> Result<(Tensor, Tensor, Tensor), Error> {
-        let queries = inputs.matmul(&self.w_query)?;
-        let keys = inputs.matmul(&self.w_key)?;
-        let values = inputs.matmul(&self.w_value)?;
+        // use linear layer's forward to create the matrices
+        let queries = self.w_query.forward(inputs)?;
+        let keys = self.w_key.forward(inputs)?;
+        let values = self.w_value.forward(inputs)?;
 
         Ok((queries, keys, values))
     }
 
     pub fn get_weights(&self) -> (&Tensor, &Tensor, &Tensor) {
-        (&self.w_query, &self.w_key, &self.w_value)
+        (
+            &self.w_query.weight,
+            &self.w_key.weight,
+            &self.w_value.weight,
+        )
     }
 
     // needs work and optimization - simple implementation for now
     pub fn update_weights(
         &mut self,
-        w_query: Tensor,
-        w_key: Tensor,
-        w_value: Tensor,
+        w_query: Linear,
+        w_key: Linear,
+        w_value: Linear,
     ) -> Result<(), Error> {
         self.w_query = w_query;
         self.w_key = w_key;
@@ -178,9 +163,9 @@ impl NeuralNet {
     }
 
     pub fn forward(&self, input: &Tensor) -> Result<Tensor, Error> {
-        let keys = input.matmul(&self.w_key)?;
-        let queries = input.matmul(&self.w_query)?;
-        let values = input.matmul(&self.w_value)?;
+        let queries = self.w_query.forward(input)?;
+        let keys = self.w_key.forward(input)?;
+        let values = self.w_value.forward(input)?;
 
         let keys_t = keys.t()?;
 
@@ -225,7 +210,6 @@ impl Linear {
         };
 
         // Glorot uniform initialization to maintain variance across forward/backward prop
-        // Standard deviation = sqrt(2.0 / (in_features + out_features))
         let std_dev = (2.0 / (in_features + out_features) as f64).sqrt() as f32;
         let bound = std_dev * (3.0_f32).sqrt();
 
@@ -236,7 +220,7 @@ impl Linear {
             weight_data.push(rng.random_range(-bound..bound));
         }
 
-        let weight = Tensor::from_vec(weight_data, weight_size, device)?;
+        let weight = Tensor::from_vec(weight_data, (in_features, out_features), device)?;
 
         let bias = if bias {
             Some(Tensor::zeros(
