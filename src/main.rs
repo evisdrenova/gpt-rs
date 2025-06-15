@@ -238,5 +238,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("masked_scores: {}", masked_weights);
 
+    let last_dim = masked_weights.rank() - 1;
+
+    let row_sums = masked_weights.sum_keepdim(last_dim)?;
+
+    let masked_norm = masked_weights.broadcast_div(&row_sums)?;
+
+    println!("masked_scores: {}", masked_norm);
+
     Ok(())
 }

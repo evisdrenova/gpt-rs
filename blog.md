@@ -1476,7 +1476,7 @@ Then we can apply that to our attention weights to mask out the tokens in each v
 
 First, we get the context length from the calculated attention scores. Then we create and apply the mask.
 
-Ultimately, we'll get something like:
+We'll get something like:
 
 ```bash
 attn_weights_2: [[0.1927, 0.1492, 0.1497, 0.1703, 0.1753, 0.1628],
@@ -1501,3 +1501,13 @@ masked_scores: [[0.1927, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
  [0.2130, 0.1372, 0.1380, 0.1718, 0.1808, 0.1591]]
 Tensor[[6, 6], f32]
 ```
+
+Our last step here is to renormalize the attention weights to sum up to one. We can do that by doing:
+
+```rust
+    let last_dim = masked_weights.rank() - 1;
+    let row_sums = masked_weights.sum_keepdim(last_dim)?;
+    let masked_norm = masked_weights.broadcast_div(&row_sums)?;
+```
+
+Here's we're dividing each element in a row by the sum in order to get the renormalized weights that will add up to 1 in each row.
