@@ -5,10 +5,6 @@ pub struct NeuralNet {
     pub w_query: Linear,
     pub w_key: Linear,
     pub w_value: Linear,
-    pub d_in: usize,
-    pub d_out: usize,
-    pub device: Device,
-    pub bias: bool,
 }
 
 impl NeuralNet {
@@ -46,10 +42,6 @@ impl NeuralNet {
             w_query,
             w_key,
             w_value,
-            d_in,
-            d_out,
-            device,
-            bias,
         })
     }
 
