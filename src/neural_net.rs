@@ -1,13 +1,20 @@
-use candle_core::{Device, Error, Tensor};
+use candle_core::{DType, Device, Error, Tensor};
 use rand::{Rng, SeedableRng, rngs::StdRng};
+
+// TODO:
+// when we do auto-grad, we will have to update this to store teh computed q,k,v tensors
 
 pub struct NeuralNet {
     pub w_query: Linear,
     pub w_key: Linear,
     pub w_value: Linear,
+    d_in: usize,
+    d_out: usize,
+    device: Device,
 }
 
 impl NeuralNet {
+    // initializes a new Neural Net with d_in*d_out Linear layers
     pub fn new(
         d_in: usize,
         d_out: usize,
@@ -42,6 +49,9 @@ impl NeuralNet {
             w_query,
             w_key,
             w_value,
+            d_in,
+            d_out,
+            device,
         })
     }
 
@@ -171,9 +181,7 @@ impl NeuralNet {
     }
 
     pub fn forward(&self, input: &Tensor) -> Result<Tensor, Error> {
-        let queries = self.w_query.forward(input)?;
-        let keys = self.w_key.forward(input)?;
-        let values = self.w_value.forward(input)?;
+        let (queries, keys, values) = self.create_qkv_matrices(input)?;
 
         let keys_t = keys.t()?;
 
@@ -189,6 +197,22 @@ impl NeuralNet {
         let context_vecs = attn_weights.matmul(&values)?;
 
         Ok(context_vecs)
+    }
+
+    pub fn tril(size: usize, device: &Device) -> Result<Tensor, Error> {
+        let mut mask_data = Vec::with_capacity(size * size);
+
+        for row in 0..size {
+            for col in 0..size {
+                if col <= row {
+                    mask_data.push(1.0f32);
+                } else {
+                    mask_data.push(0.0f32);
+                }
+            }
+        }
+
+        Tensor::from_vec(mask_data, (size, size), device)
     }
 }
 

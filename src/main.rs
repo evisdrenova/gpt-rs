@@ -219,5 +219,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sa_v2 = new_layer.forward(&inputs)?;
     println!("sa_v2: {}", sa_v2);
 
+    let queries = new_layer.w_query.forward(&inputs)?;
+    let keys = new_layer.w_key.forward(&inputs)?;
+    let attn_scores = queries.matmul(&keys.t()?)?;
+
+    let scale = 1.0 / (d_k as f32).sqrt();
+    println!("teh scale factor {}", scale);
+    let scaled_scores = attn_scores.affine(scale as f64, 0.0)?;
+    let attn_weights = NeuralNet::softmax(&scaled_scores, Some(1))?;
+    println!("attn_weights_2: {}", attn_weights);
+
+    let context_length = attn_scores.shape().dims()[0];
+    let mask = NeuralNet::tril(context_length, attn_scores.device())?;
+
+    let neg_inf = -1e9f64;
+    let mask_neg_inf = (mask - 1.0)? * neg_inf;
+    let masked_scores = (attn_scores + mask_neg_inf)?;
+
+    println!("masked_scores: {}", masked_scores);
+
     Ok(())
 }

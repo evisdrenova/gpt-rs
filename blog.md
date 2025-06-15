@@ -1394,7 +1394,7 @@ represents the actual content or representation of the input items. Once the mod
 determines which keys (and thus which parts of the input) are most relevant to the
 query (the current focus item), it retrieves the corresponding values.
 
-Now we can bring it all together with our forward method to calcualte the attention weights:
+Now we can bring it all together with our forward method to calculate the attention weights:
 
 ```rust
     pub fn forward(&self, input: &Tensor) -> Result<Tensor, Error> {
@@ -1427,6 +1427,8 @@ So if the input sequence is:
 
 `The dog ran from the car`
 
-Previously, if we were computing the attention scores for the `dog` token then we would calculate teh attention scores and context vectors for every token in the input with a reference to the `dog` token.
+Previously, if we were computing the attention scores for the `dog` token then we would calculate the attention scores and context vectors for every token in the input with a reference to the `dog` token.
 
 Now, we will only calculate attention scores for the `The dog` tokens.
+
+One way to do this is to calculate the attention scores, apply a softmax and normalize the scores (rows sum to 1), mask attention scores, then renormalize since we now have zero'd out some of the values in the rows.
