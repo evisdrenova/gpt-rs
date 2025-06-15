@@ -21,10 +21,26 @@ impl NeuralNet {
     ) -> Result<Self, Error> {
         let bias = bias.unwrap_or(false);
 
-        // create linear layers
-        let w_query = Linear::new(d_in, d_out, bias, &device, seed)?;
-        let w_key = Linear::new(d_in, d_out, bias, &device, seed)?;
-        let w_value = Linear::new(d_in, d_out, bias, &device, seed)?;
+        let (query_seed, key_seed, value_seed) = match seed {
+            Some(base_seed) => {
+                // If seed is provided, use deterministic offsets
+                (Some(base_seed), Some(base_seed + 1), Some(base_seed + 2))
+            }
+            None => {
+                // If no seed provided, use random seeds for each layer
+                use rand::Rng;
+                let mut rng = rand::rng();
+                (
+                    Some(rng.random::<u64>()),
+                    Some(rng.random::<u64>()),
+                    Some(rng.random::<u64>()),
+                )
+            }
+        };
+
+        let w_query = Linear::new(d_in, d_out, bias, &device, query_seed)?;
+        let w_key = Linear::new(d_in, d_out, bias, &device, key_seed)?;
+        let w_value = Linear::new(d_in, d_out, bias, &device, value_seed)?;
 
         Ok(NeuralNet {
             w_query,

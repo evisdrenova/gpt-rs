@@ -175,7 +175,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let d_out = 2; // the output embedding size = (2)
     let device = Device::Cpu;
     let x_2_reshaped = x_2.unsqueeze(0)?;
-    let net = NeuralNet::new(d_in, d_out, device, Some(123))?;
+    let net = NeuralNet::new(d_in, d_out, device, Some(123), None)?;
 
     // calc weight matrices
     let (q, k, v) = NeuralNet::create_qkv_matrices(&net, &inputs)?;
@@ -213,6 +213,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // calculate the context vector for a single input token
     let context_vec_2 = attn_weights_2.matmul(&v)?;
     println!("context_vec_2: {}", context_vec_2);
+
+    let new_layer = NeuralNet::new(3, 2, Device::Cpu, Some(789), None)?;
+
+    let sa_v2 = new_layer.forward(&inputs)?;
+    println!("sa_v2: {}", sa_v2);
+
     Ok(())
 }
-
