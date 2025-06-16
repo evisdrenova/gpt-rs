@@ -1,6 +1,7 @@
-use candle_core::{Device, Error, Tensor};
+use candle_core::{DType, Device, Error, Tensor};
 use embedding::Embedding;
 use file_operations::{create_dataloader_v1, load_file};
+use gpt_rs::neural_net::Dropout;
 use tiktoken_rs::r50k_base;
 
 use neural_net::NeuralNet;
@@ -239,6 +240,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let attn_weights = NeuralNet::softmax(&masked, Some(1))?;
 
     println!("masked_scores: {}", attn_weights);
+
+    let mut dropout = Dropout::new(0.5f32);
+
+    let example = Tensor::ones((6, 6), DType::F32, &Device::Cpu)?;
+
+    println!("example: {}", example);
+
+    let dropout_example = dropout.forward(&example)?;
+
+    println!("dropout_example: {}", dropout_example);
+
+    let dropout_weights = dropout.forward(&attn_weights)?;
+
+    println!("dropout_weights: {}", dropout_weights);
 
     Ok(())
 }

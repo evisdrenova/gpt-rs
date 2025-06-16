@@ -1518,4 +1518,98 @@ We can add a drop out mask to reduce potential overfitting by randomly masking v
 
 There are two places you can apply drop out: after calculating the attention weights or after applying the attention weights to the vectors. We'll do it after calculating the attention weights. We'll also use a dropout rate of 50% meaning that we will mask 50% of the values and set them to zero. To compensate for the drop out we scale up the remaining values by 1/(dropout) = 1/.5 = 2.
 
+To do this, let's create our own dropout struct:
 
+```rust
+pub struct Dropout {
+    p: f32,
+}
+
+impl Dropout {
+    pub fn new(p: f32) -> Self {
+        Dropout { p }
+    }
+
+    pub fn forward(&mut self, x: &Tensor) -> Result<Tensor, Error> {
+        // 1) get dims and total element count
+        let dims = x.shape().dims();
+        let n: usize = dims.iter().product();
+
+        // 2) compute scale
+        let keep_prob = 1.0 - self.p;
+        let scale = 1.0 / keep_prob;
+
+        // 3) build mask_vec
+        let mut rng = rand::rng();
+        let mut mask_vec = Vec::with_capacity(n);
+        for _ in 0..n {
+            let r: f32 = rng.random(); // in [0,1)
+            if r < self.p {
+                mask_vec.push(0.0);
+            } else {
+                mask_vec.push(scale);
+            }
+        }
+
+        // 4) make mask Tensor
+        let mask = Tensor::from_vec(mask_vec, dims, x.device())?;
+        // apply the mask tensor to the input tensor
+        Ok((x * mask)?)
+    }
+}
+```
+
+First we create a dropout struct which takes in the drop out probability. Then we create a forward function which runs the dropout. First, we find out how many elements are in the Tensor and then allocate a vector that size. Then we build out masked vector that we will apply to our input tensor later.
+
+Next, we iterate through the indexes of the tensor and generate a random float between [0,1) and if it's less than the probability, we mask the element. Otherwise, we scale it using the scale factor since we need to compensate for the drop out.
+
+Then lastly, we apply the mask to the input tensor.
+
+We can run that by running:
+
+```rust
+
+    let mut dropout = Dropout::new(0.5f32);
+
+    let example = Tensor::ones((6, 6), DType::F32, &Device::Cpu)?;
+
+    println!("example: {}", example);
+
+    let dropout_example = dropout.forward(&example)?;
+
+    println!("dropout_example: {}", dropout_example);
+
+    let dropout_weights = dropout.forward(&attn_weights)?;
+
+    println!("dropout_weights: {}", dropout_weights);
+```
+
+Which prints:
+
+```bash
+example: [[1., 1., 1., 1., 1., 1.],
+ [1., 1., 1., 1., 1., 1.],
+ [1., 1., 1., 1., 1., 1.],
+ [1., 1., 1., 1., 1., 1.],
+ [1., 1., 1., 1., 1., 1.],
+ [1., 1., 1., 1., 1., 1.]]
+Tensor[[6, 6], f32]
+dropout_example: [[2., 2., 2., 2., 2., 0.],
+ [0., 0., 0., 2., 0., 0.],
+ [2., 2., 2., 2., 2., 2.],
+ [2., 2., 0., 0., 0., 0.],
+ [2., 2., 0., 2., 0., 0.],
+ [0., 2., 2., 2., 2., 2.]]
+Tensor[[6, 6], f32]
+dropout_weights: [[2.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+ [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+ [0.8232, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+ [0.5935, 0.4506, 0.0000, 0.0000, 0.0000, 0.0000],
+ [0.3286, 0.4813, 0.0000, 0.3563, 0.3551, 0.0000],
+ [0.0000, 0.0000, 0.2535, 0.3454, 0.0000, 0.0000]]
+Tensor[[6, 6], f32]]
+```
+
+You can see the dropout example where we randomly drop out values from the example tensor we create. Then we apply the drop out to the attention weights.
+
+Nice!

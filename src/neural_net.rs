@@ -260,6 +260,9 @@ impl NeuralNet {
 
         Ok(masked)
     }
+
+
+    
 }
 
 pub struct Linear {
