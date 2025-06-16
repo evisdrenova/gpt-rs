@@ -8,6 +8,7 @@ pub struct NeuralNet {
     pub w_query: Linear,
     pub w_key: Linear,
     pub w_value: Linear,
+    pub dropout: Dropout,
     d_in: usize,
     d_out: usize,
     device: Device,
@@ -19,6 +20,7 @@ impl NeuralNet {
         d_in: usize,
         d_out: usize,
         device: Device,
+        dropout: f32,
         seed: Option<u64>,
         bias: Option<bool>,
     ) -> Result<Self, Error> {
@@ -44,11 +46,15 @@ impl NeuralNet {
         let w_query = Linear::new(d_in, d_out, bias, &device, query_seed)?;
         let w_key = Linear::new(d_in, d_out, bias, &device, key_seed)?;
         let w_value = Linear::new(d_in, d_out, bias, &device, value_seed)?;
+        let dropout = Dropout::new(dropout);
+
+        // do we need to add a buffer here like register_buffer in pytorch?
 
         Ok(NeuralNet {
             w_query,
             w_key,
             w_value,
+            dropout,
             d_in,
             d_out,
             device,
@@ -181,19 +187,40 @@ impl NeuralNet {
     }
 
     pub fn forward(&self, input: &Tensor) -> Result<Tensor, Error> {
+        // Handle both 2D [num_tokens, d_in] and 3D [batch, num_tokens, d_in]
+        let input_shape = input.shape().dims();
+        let num_tokens = if input_shape.len() == 3 {
+            input_shape[1] // batch, num_tokens, d_in
+        } else {
+            input_shape[0] // num_tokens, d_in (treat as batch_size=1)
+        };
+
         let (queries, keys, values) = self.create_qkv_matrices(input)?;
 
-        let keys_t = keys.t()?;
+        // PyTorch: keys.transpose(1, 2) - swap dimensions 1 and 2
+        let keys_t = if keys.rank() == 3 {
+            keys.transpose(1, 2)? // [batch, d_in, num_tokens]
+        } else {
+            keys.t()? // [d_in, num_tokens]
+        };
 
         let attn_scores = queries.matmul(&keys_t)?;
 
+        // Apply causal mask for the current num_tokens
+        let masked_scores = Self::apply_causal_mask_dynamic(&attn_scores, num_tokens)?;
+
+        // Scale by sqrt(d_k)
         let d_k = keys.dim(keys.rank() - 1)? as f64;
         let scale = 1.0 / d_k.sqrt();
+        let scaled_scores = (masked_scores * scale)?;
 
-        let scaled_scores = (attn_scores * scale)?;
+        // Apply softmax
+        let attn_weights = Self::softmax(&scaled_scores, Some(scaled_scores.rank() - 1))?;
 
-        let attn_weights = NeuralNet::softmax(&scaled_scores, Some(scaled_scores.rank() - 1))?;
+        // Apply dropout
+        let attn_weights = self.dropout.forward(&attn_weights)?;
 
+        // Compute context vectors
         let context_vecs = attn_weights.matmul(&values)?;
 
         Ok(context_vecs)
@@ -261,8 +288,47 @@ impl NeuralNet {
         Ok(masked)
     }
 
+    pub fn apply_causal_mask_dynamic(
+        attn_scores: &Tensor,
+        num_tokens: usize,
+    ) -> Result<Tensor, Error> {
+        let device = attn_scores.device();
+        let shape = attn_scores.shape().dims();
 
-    
+        // Handle both 2D [L, L] and 3D [batch, L, L]
+        let (batch_size, seq_len) = if shape.len() == 3 {
+            (Some(shape[0]), shape[1])
+        } else {
+            (None, shape[0])
+        };
+
+        // Use only the portion we need for current sequence length
+        let effective_len = std::cmp::min(seq_len, num_tokens);
+
+        // Build mask for effective_len x effective_len
+        let mut mask_data = Vec::with_capacity(effective_len * effective_len);
+        for i in 0..effective_len {
+            for j in 0..effective_len {
+                mask_data.push(if j > i { 1.0_f32 } else { 0.0_f32 });
+            }
+        }
+
+        let float_mask = if let Some(batch) = batch_size {
+            // For 3D: create mask and expand to batch
+            let mask_2d = Tensor::from_vec(mask_data, (effective_len, effective_len), device)?;
+            mask_2d
+                .unsqueeze(0)?
+                .expand(&[batch, effective_len, effective_len])?
+        } else {
+            // For 2D: just create the mask
+            Tensor::from_vec(mask_data, (effective_len, effective_len), device)?
+        };
+
+        let bool_mask = float_mask.gt(0.0)?;
+        let neg_inf = Tensor::zeros_like(attn_scores)?.affine(0.0, f64::NEG_INFINITY)?;
+
+        bool_mask.where_cond(&neg_inf, attn_scores)
+    }
 }
 
 pub struct Linear {
@@ -385,7 +451,7 @@ impl Dropout {
         Dropout { p }
     }
 
-    pub fn forward(&mut self, x: &Tensor) -> Result<Tensor, Error> {
+    pub fn forward(&self, x: &Tensor) -> Result<Tensor, Error> {
         // 1) get dims and total element count
         let dims = x.shape().dims();
         let n: usize = dims.iter().product();
@@ -413,4 +479,5 @@ impl Dropout {
     }
 }
 
+// todo: creat a layer trait that all layers implement
 // todo: update the way that we set seed values so that we can just set it once per struct i.e. like torch.manualSeed(123)
