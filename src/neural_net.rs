@@ -214,6 +214,51 @@ impl NeuralNet {
 
         Tensor::from_vec(mask_data, (size, size), device)
     }
+
+    pub fn triu(size: usize, diagonal: i32, device: &Device) -> Result<Tensor, Error> {
+        let mut mask_data = Vec::with_capacity(size * size);
+
+        for row in 0..size {
+            for col in 0..size {
+                // Upper triangular: col > row + diagonal
+                if (col as i32) > (row as i32) + diagonal {
+                    mask_data.push(1.0f32); // Upper triangle
+                } else {
+                    mask_data.push(0.0f32); // Lower triangle + diagonal
+                }
+            }
+        }
+
+        Tensor::from_vec(mask_data, (size, size), device)
+    }
+
+    pub fn apply_causal_mask(attn_scores: &Tensor) -> Result<Tensor, Error> {
+        let device = attn_scores.device();
+        let shape = attn_scores.shape().dims();
+        assert_eq!(shape.len(), 2, "expected [L, L] attn_scores");
+        let L = shape[0];
+
+        // 1) build float mask [L, L] where j > i → 1.0, else 0.0
+        let mut mask_data = Vec::with_capacity(L * L);
+        for i in 0..L {
+            for j in 0..L {
+                mask_data.push(if j > i { 1.0_f32 } else { 0.0_f32 });
+            }
+        }
+        let float_mask = Tensor::from_vec(mask_data, (L, L), device)?;
+
+        // 2) convert to bool mask via comparison
+        //    (float_mask > 0.0) yields a boolean Tensor
+        let bool_mask = float_mask.gt(0.0)?;
+
+        // 3) build a -inf tensor of the same shape & dtype as attn_scores
+        let neg_inf = Tensor::zeros_like(attn_scores)?.affine(0.0, f64::NEG_INFINITY)?;
+
+        // 4) where(bool_mask) use -inf else original
+        let masked = bool_mask.where_cond(&neg_inf, attn_scores)?;
+
+        Ok(masked)
+    }
 }
 
 pub struct Linear {

@@ -230,21 +230,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("attn_weights_2: {}", attn_weights);
 
     let context_length = attn_scores.shape().dims()[0];
-    let mask = NeuralNet::tril(context_length, attn_scores.device())?;
+    let mask = NeuralNet::triu(context_length, 1, attn_scores.device())?;
 
     println!("mask: {}", mask);
 
-    let masked_weights = attn_weights.broadcast_mul(&mask)?;
+    let masked = NeuralNet::apply_causal_mask(&attn_scores)?;
 
-    println!("masked_scores: {}", masked_weights);
+    let attn_weights = NeuralNet::softmax(&masked, Some(1))?;
 
-    let last_dim = masked_weights.rank() - 1;
-
-    let row_sums = masked_weights.sum_keepdim(last_dim)?;
-
-    let masked_norm = masked_weights.broadcast_div(&row_sums)?;
-
-    println!("masked_scores: {}", masked_norm);
+    println!("masked_scores: {}", attn_weights);
 
     Ok(())
 }
