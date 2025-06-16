@@ -232,6 +232,7 @@ impl NeuralNet {
         Tensor::from_vec(mask_data, (size, size), device)
     }
 
+    // adds in teh causal mask to the attention scores
     pub fn apply_causal_mask(attn_scores: &Tensor) -> Result<Tensor, Error> {
         let device = attn_scores.device();
         let shape = attn_scores.shape().dims();
@@ -371,3 +372,42 @@ impl Linear {
         weight_params + bias_params
     }
 }
+
+pub struct Dropout {
+    p: f32,
+}
+
+impl Dropout {
+    pub fn new(p: f32) -> Self {
+        Dropout { p }
+    }
+
+    pub fn forward(&mut self, x: &Tensor) -> Result<Tensor, Error> {
+        // 1) get dims and total element count
+        let dims = x.shape().dims();
+        let n: usize = dims.iter().product();
+
+        // 2) compute scale
+        let keep_prob = 1.0 - self.p;
+        let scale = 1.0 / keep_prob;
+
+        // 3) build mask_vec
+        let mut rng = rand::rng();
+        let mut mask_vec = Vec::with_capacity(n);
+        for _ in 0..n {
+            let r: f32 = rng.random(); // in [0,1)
+            if r < self.p {
+                mask_vec.push(0.0);
+            } else {
+                mask_vec.push(scale);
+            }
+        }
+
+        // 4) make mask Tensor
+        let mask = Tensor::from_vec(mask_vec, dims, x.device())?;
+        // apply the mask tensor to the input tensor
+        Ok((x * mask)?)
+    }
+}
+
+// todo: update the way that we set seed values so that we can just set it once per struct i.e. like torch.manualSeed(123)

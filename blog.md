@@ -1511,3 +1511,11 @@ Our last step here is to renormalize the attention weights to sum up to one. We 
 ```
 
 Here's we're dividing each element in a row by the sum in order to get the renormalized weights that will add up to 1 in each row.
+
+### Applying a drop out mask to reduce overfitting
+
+We can add a drop out mask to reduce potential overfitting by randomly masking values within our attention weights.
+
+There are two places you can apply drop out: after calculating the attention weights or after applying the attention weights to the vectors. We'll do it after calculating the attention weights. We'll also use a dropout rate of 50% meaning that we will mask 50% of the values and set them to zero. To compensate for the drop out we scale up the remaining values by 1/(dropout) = 1/.5 = 2.
+
+
