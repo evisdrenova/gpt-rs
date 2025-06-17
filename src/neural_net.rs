@@ -50,8 +50,6 @@ impl NeuralNet {
         let w_value = Linear::new(d_in, d_out, bias, &device, value_seed)?;
         let dropout = Dropout::new(dropout);
 
-        // do we need to add a buffer here like register_buffer in pytorch?
-
         let mask = Self::create_causal_mask(context_length, &device)?;
 
         Ok(NeuralNet {
@@ -64,6 +62,18 @@ impl NeuralNet {
             d_out,
             device,
         })
+    }
+
+    fn create_causal_mask(context_length: usize, device: &Device) -> Result<Tensor, Error> {
+        let mut mask_data = Vec::with_capacity(context_length * context_length);
+
+        for i in 0..context_length {
+            for j in 0..context_length {
+                mask_data.push(if j > i { 1.0f32 } else { 0.0f32 });
+            }
+        }
+
+        Tensor::from_vec(mask_data, (context_length, context_length), device)
     }
 
     pub fn create_qkv_matrices(&self, inputs: &Tensor) -> Result<(Tensor, Tensor, Tensor), Error> {
@@ -194,14 +204,17 @@ impl NeuralNet {
     pub fn forward(&self, input: &Tensor) -> Result<Tensor, Error> {
         // Handle both 2D [num_tokens, d_in] and 3D [batch, num_tokens, d_in]
         let input_shape = input.shape().dims();
-        let num_tokens = if input_shape.len() == 3 {
-            input_shape[1] // batch, num_tokens, d_in
+
+        let (batch_size, num_tokens) = if input_shape.len() == 3 {
+            (input_shape[0], input_shape[1])
+        } else if input_shape.len() == 2 {
+            (1, input_shape[0]) // Treat 2D as batch_size=1
         } else {
-            input_shape[0] // num_tokens, d_in (treat as batch_size=1)
+            return Err(Error::Msg("Input must be 2D or 3D tensor".into()));
         };
-
+        println!(".5");
         let (queries, keys, values) = self.create_qkv_matrices(input)?;
-
+        println!(".6");
         // PyTorch: keys.transpose(1, 2) - swap dimensions 1 and 2
         let keys_t = if keys.rank() == 3 {
             keys.transpose(1, 2)? // [batch, d_in, num_tokens]
@@ -209,11 +222,12 @@ impl NeuralNet {
             keys.t()? // [d_in, num_tokens]
         };
 
+        println!("1");
         let attn_scores = queries.matmul(&keys_t)?;
 
         // Apply causal mask for the current num_tokens
-        let masked_scores = Self::apply_causal_mask_dynamic(&attn_scores, num_tokens)?;
-
+        let masked_scores = self.apply_causal_mask_slice(&attn_scores, num_tokens)?;
+        println!("2");
         // Scale by sqrt(d_k)
         let d_k = keys.dim(keys.rank() - 1)? as f64;
         let scale = 1.0 / d_k.sqrt();
@@ -293,43 +307,34 @@ impl NeuralNet {
         Ok(masked)
     }
 
-    pub fn apply_causal_mask_dynamic(
+    fn apply_causal_mask_slice(
+        &self,
         attn_scores: &Tensor,
         num_tokens: usize,
     ) -> Result<Tensor, Error> {
         let device = attn_scores.device();
         let shape = attn_scores.shape().dims();
 
-        // Handle both 2D [L, L] and 3D [batch, L, L]
-        let (batch_size, seq_len) = if shape.len() == 3 {
-            (Some(shape[0]), shape[1])
-        } else {
-            (None, shape[0])
-        };
-
-        // Use only the portion we need for current sequence length
-        let effective_len = std::cmp::min(seq_len, num_tokens);
-
-        // Build mask for effective_len x effective_len
-        let mut mask_data = Vec::with_capacity(effective_len * effective_len);
-        for i in 0..effective_len {
-            for j in 0..effective_len {
-                mask_data.push(if j > i { 1.0_f32 } else { 0.0_f32 });
-            }
-        }
-
-        let float_mask = if let Some(batch) = batch_size {
-            // For 3D: create mask and expand to batch
-            let mask_2d = Tensor::from_vec(mask_data, (effective_len, effective_len), device)?;
+        // Slice the pre-computed mask to the current sequence length
+        let mask_slice = if shape.len() == 3 {
+            // For 3D: [batch, num_tokens, num_tokens]
+            let batch_size = shape[0];
+            let mask_2d = self
+                .mask
+                .narrow(0, 0, num_tokens)?
+                .narrow(1, 0, num_tokens)?;
             mask_2d
                 .unsqueeze(0)?
-                .expand(&[batch, effective_len, effective_len])?
+                .expand(&[batch_size, num_tokens, num_tokens])?
         } else {
-            // For 2D: just create the mask
-            Tensor::from_vec(mask_data, (effective_len, effective_len), device)?
+            // For 2D: [num_tokens, num_tokens]
+            self.mask
+                .narrow(0, 0, num_tokens)?
+                .narrow(1, 0, num_tokens)?
         };
 
-        let bool_mask = float_mask.gt(0.0)?;
+        // Convert to boolean mask and apply
+        let bool_mask = mask_slice.gt(0.0)?;
         let neg_inf = Tensor::zeros_like(attn_scores)?.affine(0.0, f64::NEG_INFINITY)?;
 
         bool_mask.where_cond(&neg_inf, attn_scores)

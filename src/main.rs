@@ -176,84 +176,84 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let d_out = 2; // the output embedding size = (2)
     let device = Device::Cpu;
     let x_2_reshaped = x_2.unsqueeze(0)?;
-    let net = NeuralNet::new(d_in, d_out, device, 0.5, Some(123), None)?;
+    let net = NeuralNet::new(d_in, d_out, device, 3, 0.5, Some(123), None)?;
 
     // calc weight matrices
-    let (q, k, v) = NeuralNet::create_qkv_matrices(&net, &inputs)?;
+    // let (q, k, v) = NeuralNet::create_qkv_matrices(&net, &inputs)?;
 
-    println!("q {}", q);
-    println!("k {}", k);
-    println!("v {}", v);
+    // println!("q {}", q);
+    // println!("k {}", k);
+    // println!("v {}", v);
 
-    let query_2 = q.get(1)?;
-    let keys_2 = k.get(1)?;
+    // let query_2 = q.get(1)?;
+    // let keys_2 = k.get(1)?;
 
-    println!("query_2 shape: {:?}", query_2.shape());
-    println!("keys_2 shape: {:?}", keys_2.shape());
+    // println!("query_2 shape: {:?}", query_2.shape());
+    // println!("keys_2 shape: {:?}", keys_2.shape());
 
-    let atten_score_22 = (query_2.clone() * keys_2)?.sum_all()?;
-    println!("attn_score_22: {}", atten_score_22);
+    // let atten_score_22 = (query_2.clone() * keys_2)?.sum_all()?;
+    // println!("attn_score_22: {}", atten_score_22);
 
-    let k_transpose = k.transpose(0, 1)?;
-    println!("k_transpose shape: {:?}", k_transpose.shape());
+    // let k_transpose = k.transpose(0, 1)?;
+    // println!("k_transpose shape: {:?}", k_transpose.shape());
 
-    let query_2_reshaped = query_2.unsqueeze(0)?;
-    let atten_score_all = query_2_reshaped.matmul(&k_transpose)?;
-    println!("atten_score_all: {}", atten_score_all);
+    // let query_2_reshaped = query_2.unsqueeze(0)?;
+    // let atten_score_all = query_2_reshaped.matmul(&k_transpose)?;
+    // println!("atten_score_all: {}", atten_score_all);
 
-    let d = k.shape().dims().last().unwrap();
-    let d_k = k.shape().dims()[1];
+    // let d = k.shape().dims().last().unwrap();
+    // let d_k = k.shape().dims()[1];
 
-    let scale = 1.0 / (d_k as f32).sqrt();
-    println!("teh scale factor {}", scale);
-    let scaled_scores = atten_score_all.affine(scale as f64, 0.0)?;
-    let attn_weights_2 = NeuralNet::softmax(&scaled_scores, Some(1))?;
+    // let scale = 1.0 / (d_k as f32).sqrt();
+    // println!("teh scale factor {}", scale);
+    // let scaled_scores = atten_score_all.affine(scale as f64, 0.0)?;
+    // let attn_weights_2 = NeuralNet::softmax(&scaled_scores, Some(1))?;
 
-    println!("attn_weights_2: {}", attn_weights_2);
+    // println!("attn_weights_2: {}", attn_weights_2);
 
-    // calculate the context vector for a single input token
-    let context_vec_2 = attn_weights_2.matmul(&v)?;
-    println!("context_vec_2: {}", context_vec_2);
+    // // calculate the context vector for a single input token
+    // let context_vec_2 = attn_weights_2.matmul(&v)?;
+    // println!("context_vec_2: {}", context_vec_2);
 
-    let new_layer = NeuralNet::new(3, 2, Device::Cpu, 0.0, None, None)?;
+    // let new_layer = NeuralNet::new(3, 2, Device::Cpu, 3, 0.0, None, None)?;
 
-    let sa_v2 = new_layer.forward(&inputs)?;
-    println!("sa_v2: {}", sa_v2);
+    // let sa_v2 = new_layer.forward(&inputs)?;
+    // println!("sa_v2: {}", sa_v2);
 
-    let queries = new_layer.w_query.forward(&inputs)?;
-    let keys = new_layer.w_key.forward(&inputs)?;
-    let attn_scores = queries.matmul(&keys.t()?)?;
+    // let queries = new_layer.w_query.forward(&inputs)?;
+    // let keys = new_layer.w_key.forward(&inputs)?;
+    // let attn_scores = queries.matmul(&keys.t()?)?;
 
-    let scale = 1.0 / (d_k as f32).sqrt();
-    println!("teh scale factor {}", scale);
-    let scaled_scores = attn_scores.affine(scale as f64, 0.0)?;
-    let attn_weights = NeuralNet::softmax(&scaled_scores, Some(1))?;
-    println!("attn_weights_2: {}", attn_weights);
+    // let scale = 1.0 / (d_k as f32).sqrt();
+    // println!("teh scale factor {}", scale);
+    // let scaled_scores = attn_scores.affine(scale as f64, 0.0)?;
+    // let attn_weights = NeuralNet::softmax(&scaled_scores, Some(1))?;
+    // println!("attn_weights_2: {}", attn_weights);
 
-    let context_length = attn_scores.shape().dims()[1];
-    let mask = NeuralNet::triu(context_length, 1, attn_scores.device())?;
+    // let context_length = attn_scores.shape().dims()[1];
+    // let mask = NeuralNet::triu(context_length, 1, attn_scores.device())?;
 
-    println!("mask: {}", mask);
+    // println!("mask: {}", mask);
 
-    let masked = NeuralNet::apply_causal_mask(&attn_scores)?;
+    // let masked = NeuralNet::apply_causal_mask(&attn_scores)?;
 
-    let attn_weights = NeuralNet::softmax(&masked, Some(1))?;
+    // let attn_weights = NeuralNet::softmax(&masked, Some(1))?;
 
-    println!("masked_scores: {}", attn_weights);
+    // println!("masked_scores: {}", attn_weights);
 
-    let mut dropout = Dropout::new(0.5f32);
+    // let mut dropout = Dropout::new(0.5f32);
 
-    let example = Tensor::ones((6, 6), DType::F32, &Device::Cpu)?;
+    // let example = Tensor::ones((6, 6), DType::F32, &Device::Cpu)?;
 
-    println!("example: {}", example);
+    // println!("example: {}", example);
 
-    let dropout_example = dropout.forward(&example)?;
+    // let dropout_example = dropout.forward(&example)?;
 
-    println!("dropout_example: {}", dropout_example);
+    // println!("dropout_example: {}", dropout_example);
 
-    let dropout_weights = dropout.forward(&attn_weights)?;
+    // let dropout_weights = dropout.forward(&attn_weights)?;
 
-    println!("dropout_weights: {}", dropout_weights);
+    // println!("dropout_weights: {}", dropout_weights);
 
     let batch = Tensor::stack(&[&inputs, &inputs], 0)?;
 
@@ -261,7 +261,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let context_length = batch.shape().dims()[1];
 
-    let nn_layer = NeuralNet::new(3, 2, Device::Cpu, 0.0, None, None)?;
+    println!("context_length:{:?}", context_length);
+
+    let nn_layer = NeuralNet::new(3, 2, Device::Cpu, context_length, 0.0, None, None)?;
 
     let ca = NeuralNet::forward(&nn_layer, &batch)?;
 
