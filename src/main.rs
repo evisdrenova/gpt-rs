@@ -176,7 +176,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let d_out = 2; // the output embedding size = (2)
     let device = Device::Cpu;
     let x_2_reshaped = x_2.unsqueeze(0)?;
-    let net = NeuralNet::new(d_in, d_out, device, Some(123), None)?;
+    let net = NeuralNet::new(d_in, d_out, device, 0.5, Some(123), None)?;
 
     // calc weight matrices
     let (q, k, v) = NeuralNet::create_qkv_matrices(&net, &inputs)?;
@@ -215,7 +215,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let context_vec_2 = attn_weights_2.matmul(&v)?;
     println!("context_vec_2: {}", context_vec_2);
 
-    let new_layer = NeuralNet::new(3, 2, Device::Cpu, Some(789), None)?;
+    let new_layer = NeuralNet::new(3, 2, Device::Cpu, 0.0, None, None)?;
 
     let sa_v2 = new_layer.forward(&inputs)?;
     println!("sa_v2: {}", sa_v2);
@@ -230,7 +230,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let attn_weights = NeuralNet::softmax(&scaled_scores, Some(1))?;
     println!("attn_weights_2: {}", attn_weights);
 
-    let context_length = attn_scores.shape().dims()[0];
+    let context_length = attn_scores.shape().dims()[1];
     let mask = NeuralNet::triu(context_length, 1, attn_scores.device())?;
 
     println!("mask: {}", mask);
@@ -254,6 +254,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dropout_weights = dropout.forward(&attn_weights)?;
 
     println!("dropout_weights: {}", dropout_weights);
+
+    let batch = Tensor::stack(&[&inputs, &inputs], 0)?;
+
+    println!("batvh shae:{:?}", batch.shape());
+
+    let context_length = batch.shape().dims()[1];
+
+    let nn_layer = NeuralNet::new(3, 2, Device::Cpu, 0.0, None, None)?;
+
+    let ca = NeuralNet::forward(&nn_layer, &batch)?;
+
+    println!("ca:{:?}", ca);
 
     Ok(())
 }

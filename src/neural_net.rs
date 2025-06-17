@@ -9,6 +9,7 @@ pub struct NeuralNet {
     pub w_key: Linear,
     pub w_value: Linear,
     pub dropout: Dropout,
+    pub mask: Tensor,
     d_in: usize,
     d_out: usize,
     device: Device,
@@ -20,6 +21,7 @@ impl NeuralNet {
         d_in: usize,
         d_out: usize,
         device: Device,
+        context_length: usize,
         dropout: f32,
         seed: Option<u64>,
         bias: Option<bool>,
@@ -50,11 +52,14 @@ impl NeuralNet {
 
         // do we need to add a buffer here like register_buffer in pytorch?
 
+        let mask = Self::create_causal_mask(context_length, &device)?;
+
         Ok(NeuralNet {
             w_query,
             w_key,
             w_value,
             dropout,
+            mask,
             d_in,
             d_out,
             device,
