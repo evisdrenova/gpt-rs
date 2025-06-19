@@ -77,8 +77,11 @@ impl NeuralNet {
     }
 
     pub fn create_qkv_matrices(&self, inputs: &Tensor) -> Result<(Tensor, Tensor, Tensor), Error> {
+        println!("Input shape: {:?}", inputs.shape());
+        println!("Query weight shape: {:?}", self.w_query.weight.shape());
         // use linear layer's forward to create the matrices
         let queries = self.w_query.forward(inputs)?;
+        println!("after the query");
         let keys = self.w_key.forward(inputs)?;
         let values = self.w_value.forward(inputs)?;
 
@@ -204,7 +207,7 @@ impl NeuralNet {
     pub fn forward(&self, input: &Tensor) -> Result<Tensor, Error> {
         // Handle both 2D [num_tokens, d_in] and 3D [batch, num_tokens, d_in]
         let input_shape = input.shape().dims();
-
+        println!("input shape:{:?}", input_shape);
         let (batch_size, num_tokens) = if input_shape.len() == 3 {
             (input_shape[0], input_shape[1])
         } else if input_shape.len() == 2 {
@@ -212,7 +215,11 @@ impl NeuralNet {
         } else {
             return Err(Error::Msg("Input must be 2D or 3D tensor".into()));
         };
+
         println!(".5");
+
+        println!("the input shape{:?}", input);
+
         let (queries, keys, values) = self.create_qkv_matrices(input)?;
         println!(".6");
         // PyTorch: keys.transpose(1, 2) - swap dimensions 1 and 2
@@ -377,7 +384,8 @@ impl Linear {
             weight_data.push(rng.random_range(-bound..bound));
         }
 
-        let weight = Tensor::from_vec(weight_data, (in_features, out_features), device)?;
+        // PyTorch: weight shape is [out_features, in_features]
+        let weight = Tensor::from_vec(weight_data, (out_features, in_features), device)?;
 
         let bias = if bias {
             Some(Tensor::zeros(
@@ -400,6 +408,8 @@ impl Linear {
     pub fn forward(&self, input: &Tensor) -> Result<Tensor, Error> {
         let input_shape = input.dims();
 
+        println!("the input in the forward {:?}", input_shape);
+
         if input_shape.is_empty() {
             return Err(Error::Msg("Input tensor cannot be empty".into()));
         }
@@ -415,14 +425,21 @@ impl Linear {
             ));
         }
 
-        // do forward pass by matmul the input tensor with the weight tensor
-        let output = input.matmul(&self.weight)?;
+        println!("before transpose{:?}", self.weight);
 
-        // Add bias if present
-        match &self.bias {
-            Some(bias) => output.broadcast_add(bias),
-            None => Ok(output),
-        }
+        // transpose the weight matric to [in_features, out_features]
+        let weight_t = self.weight.t()?;
+
+        println!("after transpose{:?}", weight_t);
+        // broadcast_matmul will auto-rerank matrices so they are compatible
+        input.broadcast_matmul(&weight_t).and_then(|out| {
+            // optionally add bias
+            if let Some(b) = &self.bias {
+                out.broadcast_add(b)
+            } else {
+                Ok(out)
+            }
+        })
     }
 
     // get a reference to the weight tensor
