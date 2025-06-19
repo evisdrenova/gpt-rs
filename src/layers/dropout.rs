@@ -11,15 +11,15 @@ impl Dropout {
     }
 
     pub fn forward(&self, x: &Tensor) -> Result<Tensor, Error> {
-        // 1) get dims and total element count
+        // get dims and total element count
         let dims = x.shape().dims();
         let n: usize = dims.iter().product();
 
-        // 2) compute scale
+        // compute scale factor for values that don't get dropped out
         let keep_prob = 1.0 - self.p;
         let scale = 1.0 / keep_prob;
 
-        // 3) build mask_vec
+        // build mask_vec and push to vector when the rng number is less than the dropout probability
         let mut rng = rand::rng();
         let mut mask_vec = Vec::with_capacity(n);
         for _ in 0..n {
@@ -31,7 +31,6 @@ impl Dropout {
             }
         }
 
-        // 4) make mask Tensor
         let mask = Tensor::from_vec(mask_vec, dims, x.device())?;
 
         // apply the mask tensor to the input tensor

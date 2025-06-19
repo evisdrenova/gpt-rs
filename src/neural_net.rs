@@ -2,9 +2,6 @@ use candle_core::{Device, Error, Tensor};
 
 use crate::layers::{Dropout, Linear};
 
-// TODO:
-// when we do auto-grad, we will have to update this to store teh computed q,k,v tensors
-
 pub struct NeuralNet {
     pub w_query: Linear,
     pub w_key: Linear,
@@ -43,6 +40,7 @@ impl NeuralNet {
             }
         };
 
+        // create q,k,v matrices and apply dropout
         let w_query = Linear::new(d_in, d_out, bias, &device, query_seed)?;
         let w_key = Linear::new(d_in, d_out, bias, &device, key_seed)?;
         let w_value = Linear::new(d_in, d_out, bias, &device, value_seed)?;
@@ -238,39 +236,6 @@ impl NeuralNet {
         Ok(context_vecs)
     }
 
-    pub fn tril(size: usize, device: &Device) -> Result<Tensor, Error> {
-        let mut mask_data = Vec::with_capacity(size * size);
-
-        for row in 0..size {
-            for col in 0..size {
-                if col <= row {
-                    mask_data.push(1.0f32);
-                } else {
-                    mask_data.push(0.0f32);
-                }
-            }
-        }
-
-        Tensor::from_vec(mask_data, (size, size), device)
-    }
-
-    pub fn triu(size: usize, diagonal: i32, device: &Device) -> Result<Tensor, Error> {
-        let mut mask_data = Vec::with_capacity(size * size);
-
-        for row in 0..size {
-            for col in 0..size {
-                // Upper triangular: col > row + diagonal
-                if (col as i32) > (row as i32) + diagonal {
-                    mask_data.push(1.0f32); // Upper triangle
-                } else {
-                    mask_data.push(0.0f32); // Lower triangle + diagonal
-                }
-            }
-        }
-
-        Tensor::from_vec(mask_data, (size, size), device)
-    }
-
     // adds in teh causal mask to the attention scores
     pub fn apply_causal_mask(attn_scores: &Tensor) -> Result<Tensor, Error> {
         let device = attn_scores.device();
@@ -336,3 +301,4 @@ impl NeuralNet {
 
 // todo: creat a layer trait that all layers implement
 // todo: update the way that we set seed values so that we can just set it once per struct i.e. like torch.manualSeed(123)
+// todo: when we do auto-grad, we will have to update this to store teh computed q,k,v tensors

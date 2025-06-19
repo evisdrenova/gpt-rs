@@ -15,10 +15,10 @@ impl Linear {
         bias: bool,
         device: &Device,
         seed: Option<u64>,
-    ) -> Result<Self, Error> {
-        let mut rng = match seed {
+    ) -> Result<Self, Error> { 
+        let mut rng: StdRng = match seed {
             Some(s) => StdRng::seed_from_u64(s),
-            None => StdRng::seed_from_u64(123), // no seed
+            None => StdRng::from_os_rng(), // no seed
         };
 
         // Glorot uniform initialization to maintain variance across forward/backward prop
@@ -83,31 +83,5 @@ impl Linear {
                 Ok(out)
             }
         })
-    }
-
-    // get a reference to the weight tensor
-    pub fn weight(&self) -> &Tensor {
-        &self.weight
-    }
-    // get a reference to the bias tensor
-    pub fn bias(&self) -> Option<&Tensor> {
-        self.bias.as_ref()
-    }
-
-    // check if layer has a bias
-    pub fn has_bias(&self) -> bool {
-        self.bias.is_some()
-    }
-
-    // get the number of layer parameteres
-    // weight params + bias params
-    pub fn num_parameters(&self) -> usize {
-        let weight_params = self.in_features * self.out_features;
-        let bias_params = if self.has_bias() {
-            self.out_features
-        } else {
-            0
-        };
-        weight_params + bias_params
     }
 }
