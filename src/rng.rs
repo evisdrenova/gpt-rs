@@ -12,7 +12,7 @@ pub fn seed(seed: u64) {
 }
 
 /// Obtain a locked handle to the global RNG
-fn rng() -> std::sync::MutexGuard<'static, StdRng> {
+pub fn rng() -> std::sync::MutexGuard<'static, StdRng> {
     GLOBAL_RNG
         .get_or_init(|| {
             // this closure runs only once, on first access

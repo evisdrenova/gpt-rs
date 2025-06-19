@@ -1,5 +1,7 @@
 use candle_core::{Device, Error, Tensor};
-use rand::{Rng, SeedableRng, rngs::StdRng};
+use rand::Rng;
+
+use crate::rng;
 
 pub struct Linear {
     pub weight: Tensor,
@@ -14,12 +16,8 @@ impl Linear {
         out_features: usize,
         bias: bool,
         device: &Device,
-        seed: Option<u64>,
-    ) -> Result<Self, Error> { 
-        let mut rng: StdRng = match seed {
-            Some(s) => StdRng::seed_from_u64(s),
-            None => StdRng::from_os_rng(), // no seed
-        };
+    ) -> Result<Self, Error> {
+        let mut rng = rng::rng();
 
         // Glorot uniform initialization to maintain variance across forward/backward prop
         let std_dev = (2.0 / (in_features + out_features) as f64).sqrt() as f32;

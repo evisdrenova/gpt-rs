@@ -18,32 +18,14 @@ impl NeuralNet {
         device: Device,
         context_length: usize,
         dropout: f32,
-        seed: Option<u64>,
         bias: Option<bool>,
     ) -> Result<Self, Error> {
         let bias = bias.unwrap_or(false);
 
-        let (query_seed, key_seed, value_seed) = match seed {
-            Some(base_seed) => {
-                // If seed is provided, use deterministic offsets
-                (Some(base_seed), Some(base_seed + 1), Some(base_seed + 2))
-            }
-            None => {
-                // If no seed provided, use random feeds for each layer
-                use rand::Rng;
-                let mut rng = rand::rng();
-                (
-                    Some(rng.random::<u64>()),
-                    Some(rng.random::<u64>()),
-                    Some(rng.random::<u64>()),
-                )
-            }
-        };
-
         // create q,k,v matrices and apply dropout
-        let w_query = Linear::new(d_in, d_out, bias, &device, query_seed)?;
-        let w_key = Linear::new(d_in, d_out, bias, &device, key_seed)?;
-        let w_value = Linear::new(d_in, d_out, bias, &device, value_seed)?;
+        let w_query = Linear::new(d_in, d_out, bias, &device)?;
+        let w_key = Linear::new(d_in, d_out, bias, &device)?;
+        let w_value = Linear::new(d_in, d_out, bias, &device)?;
         let dropout = Dropout::new(dropout);
 
         let mask = Self::create_causal_mask(context_length, &device)?;
@@ -300,5 +282,4 @@ impl NeuralNet {
 }
 
 // todo: creat a layer trait that all layers implement
-// todo: update the way that we set seed values so that we can just set it once per struct i.e. like torch.manualSeed(123)
 // todo: when we do auto-grad, we will have to update this to store teh computed q,k,v tensors

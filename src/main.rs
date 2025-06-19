@@ -8,6 +8,7 @@ mod embedding;
 mod file_operations;
 mod layers;
 mod neural_net;
+mod rng;
 mod simple_tokenizer;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -175,7 +176,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let d_out = 2; // the output embedding size = (2)
     let device = Device::Cpu;
     let x_2_reshaped = x_2.unsqueeze(0)?;
-    let net = NeuralNet::new(d_in, d_out, device, 3, 0.5, Some(123), None)?;
+    let net = NeuralNet::new(d_in, d_out, device, 3, 0.5, None)?;
 
     // calc weight matrices
     // let (q, k, v) = NeuralNet::create_qkv_matrices(&net, &inputs)?;
@@ -262,7 +263,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("context_length:{:?}", context_length);
 
-    let nn_layer = NeuralNet::new(3, 2, Device::Cpu, context_length, 0.0, None, None)?;
+    let nn_layer = NeuralNet::new(3, 2, Device::Cpu, context_length, 0.0, None)?;
 
     let ca = NeuralNet::forward(&nn_layer, &batch)?;
 
