@@ -1,14 +1,13 @@
 use candle_core::{DType, Device, Error, Tensor};
 use embedding::Embedding;
 use file_operations::{create_dataloader_v1, load_file};
-use gpt_rs::neural_net::Dropout;
 use tiktoken_rs::r50k_base;
 
 use neural_net::NeuralNet;
 mod embedding;
 mod file_operations;
 mod neural_net;
-mod simple_tokenizer; 
+mod simple_tokenizer;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let file_name = "the-verdict.txt";
