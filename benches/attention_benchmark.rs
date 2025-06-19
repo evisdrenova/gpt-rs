@@ -9,7 +9,7 @@ Run and open HTML report -> cargo bench && open target/criterion/report/index.ht
 
 use candle_core::{Device, Tensor};
 use criterion::{Criterion, criterion_group, criterion_main};
-use gpt_rs::neural_net::NeuralNet;
+use gpt_rs::attention::NeuralNet;
 use std::hint::black_box;
 
 fn create_test_data() -> Tensor {

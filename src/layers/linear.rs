@@ -1,5 +1,4 @@
 use candle_core::{Device, Error, Tensor};
-use rand::Rng;
 
 use crate::rng;
 
@@ -7,30 +6,24 @@ pub struct Linear {
     pub weight: Tensor,
     pub bias: Option<Tensor>,
     pub in_features: usize,
-    pub out_features: usize,
 }
 /// Applies an affine linear transformation to the incoming data: y = xA^T + b, where  x is the input tensor, A is a randomly intialized weight matrix and b is a bias term
 impl Linear {
+    // initializes a new linear layer with a random uniform weight matrix and bias (if applicable)
     pub fn new(
         in_features: usize,
         out_features: usize,
         bias: bool,
         device: &Device,
     ) -> Result<Self, Error> {
-        let mut rng = rng::rng();
-
         // Glorot uniform initialization to maintain variance across forward/backward prop
         let std_dev = (2.0 / (in_features + out_features) as f64).sqrt() as f32;
         let bound = std_dev * (3.0_f32).sqrt();
 
-        let weight_size = in_features * out_features;
+        let weight_data: Vec<f32> = (0..in_features * out_features)
+            .map(|_| rng::random_range_f32(-bound, bound))
+            .collect();
 
-        let mut weight_data: Vec<f32> = Vec::with_capacity(weight_size);
-        for _ in 0..weight_size {
-            weight_data.push(rng.random_range(-bound..bound));
-        }
-
-        // PyTorch: weight shape is [out_features, in_features]
         let weight = Tensor::from_vec(weight_data, (out_features, in_features), device)?;
 
         let bias = if bias {
@@ -47,7 +40,6 @@ impl Linear {
             weight,
             bias,
             in_features,
-            out_features,
         })
     }
 
@@ -69,7 +61,7 @@ impl Linear {
             ));
         }
 
-        // transpose the weight matric to [in_features, out_features]
+        // transpose the weight matrix
         let weight_t = self.weight.t()?;
 
         // broadcast_matmul will auto-rerank matrices so they are compatible

@@ -3,11 +3,12 @@ use embedding::Embedding;
 use file_operations::{create_dataloader_v1, load_file};
 use tiktoken_rs::r50k_base;
 
-use neural_net::NeuralNet;
+use crate::attention::CausalAttention;
+
+mod attention;
 mod embedding;
 mod file_operations;
 mod layers;
-mod neural_net;
 mod rng;
 mod simple_tokenizer;
 
@@ -134,35 +135,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let query_tensor = query?;
 
-    let output = NeuralNet::compute_attention_scores(&inputs, &query_tensor)?;
+    let output = CausalAttention::compute_attention_scores(&inputs, &query_tensor)?;
 
-    // println!("print the attention scores: {:?}", output);
+    // println!("print the CausalAttention scores: {:?}", output);
 
-    let attn_weight_2 = NeuralNet::softmax(&output, None)?;
+    let attn_weight_2 = CausalAttention::softmax(&output, None)?;
 
-    // println!("soft max norm: {:?}", NeuralNet::softmax(&output, None)?);
+    // println!("soft max norm: {:?}", CausalAttention::softmax(&output, None)?);
 
-    let context_vector = NeuralNet::compute_context_matrix(&inputs, &attn_weight_2);
+    let context_vector = CausalAttention::compute_context_matrix(&inputs, &attn_weight_2);
 
     // println!("the context vector: {:?}", context_vector);
     let inputs = inputs.to_dtype(candle_core::DType::F32)?;
-    let attn_scores = NeuralNet::compute_attention_scores_matrix(&inputs)?;
+    let attn_scores = CausalAttention::compute_attention_scores_matrix(&inputs)?;
 
-    // println!("Attention scores matrix:");
+    // println!("CausalAttention scores matrix:");
     // for i in 0..6 {
     //     let row = attn_scores.get(i)?.to_vec1::<f32>()?;
     //     println!("Row {}: {:?}", i, row);
     // }
 
-    let attn_weights_norm = NeuralNet::softmax(&attn_scores, Some(1))?;
+    let attn_weights_norm = CausalAttention::softmax(&attn_scores, Some(1))?;
 
-    // println!("Attention weights norm:");
+    // println!("CausalAttention weights norm:");
     // for i in 0..6 {
     //     let row = attn_weights_norm.get(i)?.to_vec1::<f32>()?;
     //     println!("Row {}: {:?}", i, row);
     // }
 
-    let all_context_vectors = NeuralNet::compute_context_matrix(&inputs, &attn_weights_norm)?;
+    let all_context_vectors = CausalAttention::compute_context_matrix(&inputs, &attn_weights_norm)?;
 
     // println!("context vectors:");
     // for i in 0..6 {
@@ -170,16 +171,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //     println!("Row {}: {:?}", i, row);
     // }
 
-    // trainiable self-attention weights
+    // trainiable self-CausalAttention weights
     let x_2 = inputs.get(1)?;
     let d_in = 3; // input embedding size (3) 
     let d_out = 2; // the output embedding size = (2)
     let device = Device::Cpu;
     let x_2_reshaped = x_2.unsqueeze(0)?;
-    let net = NeuralNet::new(d_in, d_out, device, 3, 0.5, None)?;
+    let net = CausalAttention::new(d_in, d_out, device, 3, 0.5, None)?;
 
     // calc weight matrices
-    // let (q, k, v) = NeuralNet::create_qkv_matrices(&net, &inputs)?;
+    // let (q, k, v) = CausalAttention::create_qkv_matrices(&net, &inputs)?;
 
     // println!("q {}", q);
     // println!("k {}", k);
@@ -207,7 +208,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // let scale = 1.0 / (d_k as f32).sqrt();
     // println!("teh scale factor {}", scale);
     // let scaled_scores = atten_score_all.affine(scale as f64, 0.0)?;
-    // let attn_weights_2 = NeuralNet::softmax(&scaled_scores, Some(1))?;
+    // let attn_weights_2 = CausalAttention::softmax(&scaled_scores, Some(1))?;
 
     // println!("attn_weights_2: {}", attn_weights_2);
 
@@ -215,7 +216,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // let context_vec_2 = attn_weights_2.matmul(&v)?;
     // println!("context_vec_2: {}", context_vec_2);
 
-    // let new_layer = NeuralNet::new(3, 2, Device::Cpu, 3, 0.0, None, None)?;
+    // let new_layer = CausalAttention::new(3, 2, Device::Cpu, 3, 0.0, None, None)?;
 
     // let sa_v2 = new_layer.forward(&inputs)?;
     // println!("sa_v2: {}", sa_v2);
@@ -227,17 +228,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // let scale = 1.0 / (d_k as f32).sqrt();
     // println!("teh scale factor {}", scale);
     // let scaled_scores = attn_scores.affine(scale as f64, 0.0)?;
-    // let attn_weights = NeuralNet::softmax(&scaled_scores, Some(1))?;
+    // let attn_weights = CausalAttention::softmax(&scaled_scores, Some(1))?;
     // println!("attn_weights_2: {}", attn_weights);
 
     // let context_length = attn_scores.shape().dims()[1];
-    // let mask = NeuralNet::triu(context_length, 1, attn_scores.device())?;
+    // let mask = CausalAttention::triu(context_length, 1, attn_scores.device())?;
 
     // println!("mask: {}", mask);
 
-    // let masked = NeuralNet::apply_causal_mask(&attn_scores)?;
+    // let masked = CausalAttention::apply_causal_mask(&attn_scores)?;
 
-    // let attn_weights = NeuralNet::softmax(&masked, Some(1))?;
+    // let attn_weights = CausalAttention::softmax(&masked, Some(1))?;
 
     // println!("masked_scores: {}", attn_weights);
 
@@ -263,9 +264,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("context_length:{:?}", context_length);
 
-    let nn_layer = NeuralNet::new(3, 2, Device::Cpu, context_length, 0.0, None)?;
+    let nn_layer = CausalAttention::new(3, 2, Device::Cpu, context_length, 0.0, None)?;
 
-    let ca = NeuralNet::forward(&nn_layer, &batch)?;
+    let ca = CausalAttention::forward(&nn_layer, &batch)?;
 
     println!("ca:{:?}", ca);
 

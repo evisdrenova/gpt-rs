@@ -2,7 +2,16 @@ use candle_core::{Device, Error, Tensor};
 
 use crate::layers::{Dropout, Linear};
 
-pub struct NeuralNet {
+/*
+
+TODOs
+
+1. when we do auto-grad, we will have to update this to store the computed q,k,v tensors
+2. creat a layer trait that all layers implement
+
+*/
+
+pub struct CausalAttention {
     pub w_query: Linear,
     pub w_key: Linear,
     pub w_value: Linear,
@@ -10,8 +19,7 @@ pub struct NeuralNet {
     pub mask: Tensor,
 }
 
-impl NeuralNet {
-    // initializes a new Neural Net with d_in*d_out Linear layers
+impl CausalAttention {
     pub fn new(
         d_in: usize,
         d_out: usize,
@@ -28,15 +36,59 @@ impl NeuralNet {
         let w_value = Linear::new(d_in, d_out, bias, &device)?;
         let dropout = Dropout::new(dropout);
 
+        // apply causal mask
         let mask = Self::create_causal_mask(context_length, &device)?;
 
-        Ok(NeuralNet {
+        Ok(CausalAttention {
             w_query,
             w_key,
             w_value,
             dropout,
             mask,
         })
+    }
+
+    pub fn forward(&self, input: &Tensor) -> Result<Tensor, Error> {
+        // Handle both 2D [num_tokens, d_in] and 3D [batch, num_tokens, d_in]
+        let input_shape = input.shape().dims();
+
+        let (batch_size, num_tokens) = if input_shape.len() == 3 {
+            (input_shape[0], input_shape[1])
+        } else if input_shape.len() == 2 {
+            (1, input_shape[0]) // Treat 2D as batch_size=1
+        } else {
+            return Err(Error::Msg("Input must be 2D or 3D tensor".into()));
+        };
+
+        let (queries, keys, values) = self.create_qkv_matrices(input)?;
+
+        // PyTorch: keys.transpose(1, 2) - swap dimensions 1 and 2
+        let keys_t = if keys.rank() == 3 {
+            keys.transpose(1, 2)? // [batch, d_in, num_tokens]
+        } else {
+            keys.t()? // [d_in, num_tokens]
+        };
+
+        let attn_scores = queries.matmul(&keys_t)?;
+
+        // Apply causal mask for the current num_tokens
+        let masked_scores = self.apply_causal_mask_slice(&attn_scores, num_tokens)?;
+
+        // Scale by sqrt(d_k)
+        let d_k = keys.dim(keys.rank() - 1)? as f64;
+        let scale = 1.0 / d_k.sqrt();
+        let scaled_scores = (masked_scores * scale)?;
+
+        // Apply softmax
+        let attn_weights = Self::softmax(&scaled_scores, Some(scaled_scores.rank() - 1))?;
+
+        // Apply dropout
+        let attn_weights = self.dropout.forward(&attn_weights)?;
+
+        // Compute context vectors
+        let context_vecs = attn_weights.matmul(&values)?;
+
+        Ok(context_vecs)
     }
 
     fn create_causal_mask(context_length: usize, device: &Device) -> Result<Tensor, Error> {
@@ -175,49 +227,6 @@ impl NeuralNet {
         Ok((weights, context))
     }
 
-    pub fn forward(&self, input: &Tensor) -> Result<Tensor, Error> {
-        // Handle both 2D [num_tokens, d_in] and 3D [batch, num_tokens, d_in]
-        let input_shape = input.shape().dims();
-
-        let (batch_size, num_tokens) = if input_shape.len() == 3 {
-            (input_shape[0], input_shape[1])
-        } else if input_shape.len() == 2 {
-            (1, input_shape[0]) // Treat 2D as batch_size=1
-        } else {
-            return Err(Error::Msg("Input must be 2D or 3D tensor".into()));
-        };
-
-        let (queries, keys, values) = self.create_qkv_matrices(input)?;
-
-        // PyTorch: keys.transpose(1, 2) - swap dimensions 1 and 2
-        let keys_t = if keys.rank() == 3 {
-            keys.transpose(1, 2)? // [batch, d_in, num_tokens]
-        } else {
-            keys.t()? // [d_in, num_tokens]
-        };
-
-        let attn_scores = queries.matmul(&keys_t)?;
-
-        // Apply causal mask for the current num_tokens
-        let masked_scores = self.apply_causal_mask_slice(&attn_scores, num_tokens)?;
-
-        // Scale by sqrt(d_k)
-        let d_k = keys.dim(keys.rank() - 1)? as f64;
-        let scale = 1.0 / d_k.sqrt();
-        let scaled_scores = (masked_scores * scale)?;
-
-        // Apply softmax
-        let attn_weights = Self::softmax(&scaled_scores, Some(scaled_scores.rank() - 1))?;
-
-        // Apply dropout
-        let attn_weights = self.dropout.forward(&attn_weights)?;
-
-        // Compute context vectors
-        let context_vecs = attn_weights.matmul(&values)?;
-
-        Ok(context_vecs)
-    }
-
     // adds in teh causal mask to the attention scores
     pub fn apply_causal_mask(attn_scores: &Tensor) -> Result<Tensor, Error> {
         let device = attn_scores.device();
@@ -280,6 +289,3 @@ impl NeuralNet {
         bool_mask.where_cond(&neg_inf, attn_scores)
     }
 }
-
-// todo: creat a layer trait that all layers implement
-// todo: when we do auto-grad, we will have to update this to store teh computed q,k,v tensors
