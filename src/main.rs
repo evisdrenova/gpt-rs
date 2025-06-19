@@ -8,7 +8,7 @@ use neural_net::NeuralNet;
 mod embedding;
 mod file_operations;
 mod neural_net;
-mod simple_tokenizer;
+mod simple_tokenizer; 
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let file_name = "the-verdict.txt";

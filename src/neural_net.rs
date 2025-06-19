@@ -10,9 +10,6 @@ pub struct NeuralNet {
     pub w_value: Linear,
     pub dropout: Dropout,
     pub mask: Tensor,
-    d_in: usize,
-    d_out: usize,
-    device: Device,
 }
 
 impl NeuralNet {
@@ -58,9 +55,6 @@ impl NeuralNet {
             w_value,
             dropout,
             mask,
-            d_in,
-            d_out,
-            device,
         })
     }
 
@@ -77,7 +71,6 @@ impl NeuralNet {
     }
 
     pub fn create_qkv_matrices(&self, inputs: &Tensor) -> Result<(Tensor, Tensor, Tensor), Error> {
-        // use linear layer's forward to create the matrices
         let queries = self.w_query.forward(inputs)?;
         let keys = self.w_key.forward(inputs)?;
         let values = self.w_value.forward(inputs)?;
@@ -204,6 +197,7 @@ impl NeuralNet {
     pub fn forward(&self, input: &Tensor) -> Result<Tensor, Error> {
         // Handle both 2D [num_tokens, d_in] and 3D [batch, num_tokens, d_in]
         let input_shape = input.shape().dims();
+
         let (batch_size, num_tokens) = if input_shape.len() == 3 {
             (input_shape[0], input_shape[1])
         } else if input_shape.len() == 2 {
@@ -343,7 +337,6 @@ pub struct Linear {
     pub weight: Tensor,
     pub bias: Option<Tensor>,
     pub in_features: usize,
-    pub out_features: usize,
 }
 /// Applies an affine linear transformation to the incoming data: y = xA^T + b, where  x is the input tensor, A is a randomly intialized weight matrix and b is a bias term
 /// * `in_features` - Size of input features
