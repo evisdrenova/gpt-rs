@@ -6,6 +6,7 @@ use tiktoken_rs::r50k_base;
 use neural_net::NeuralNet;
 mod embedding;
 mod file_operations;
+mod layers;
 mod neural_net;
 mod simple_tokenizer;
 
@@ -37,7 +38,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let (inputs, targets) = batch_result?;
 
         // let bpe = r50k_base().unwrap();
-
         // let new_text = "Your joueny starts with one step";
 
         // let tokens = bpe.encode_with_special_tokens(new_text);

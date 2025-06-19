@@ -33,6 +33,7 @@ impl Dropout {
 
         // 4) make mask Tensor
         let mask = Tensor::from_vec(mask_vec, dims, x.device())?;
+
         // apply the mask tensor to the input tensor
         Ok((x * mask)?)
     }
