@@ -1,7 +1,7 @@
 use candle_core::{DType, Device, Error, Tensor};
 use file_operations::{create_dataloader_v1, load_file};
 
-use crate::attention::CausalAttention;
+use crate::attention::{CausalAttention, MultiHeadAttentionWrapper};
 
 mod attention;
 mod embedding;
@@ -60,6 +60,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ca = CausalAttention::forward(&nn_layer, &batch)?;
 
     println!("ca:{:?}", ca);
+
+    let mha = MultiHeadAttentionWrapper::new(d_in, d_out, device, context_length, 0.0, 2, None)?;
+
+    let cv = mha.forward(&batch)?;
+
+    println!("sv:{:?}", cv);
 
     Ok(())
 }

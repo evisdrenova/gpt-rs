@@ -1617,3 +1617,56 @@ Nice!
 # Implementing multi head attention
 
 Like we did in the single attention head implementation, the multi head attention mechanism is just multiple single headed attention mechanisms running in parallel.
+
+We can implement that like this:
+
+```rust
+pub struct MultiHeadAttentionWrapper {
+    pub heads: ModuleList<CausalAttention>,
+}
+
+impl MultiHeadAttentionWrapper {
+    pub fn new(
+        d_in: usize,
+        d_out: usize,
+        device: Device,
+        context_length: usize,
+        dropout: f32,
+        num_heads: usize,
+        bias: Option<bool>,
+    ) -> Result<Self, Error> {
+        let bias = bias.unwrap_or(false);
+
+        let mut list: ModuleList<CausalAttention> = ModuleList::new();
+
+        for _ in 0..num_heads {
+            let ca =
+                CausalAttention::new(d_in, d_out, &device, context_length, dropout, Some(bias))?;
+
+            list.push(ca)
+        }
+
+        Ok(MultiHeadAttentionWrapper { heads: list })
+    }
+
+    pub fn forward(&self, input: &Tensor) -> Result<Tensor, Error> {
+        //iterate over heads and call forward on each head
+        let tensors: Result<Vec<Tensor>, Error> =
+            self.heads.iter().map(|h| h.forward(input)).collect();
+
+        let tensors = tensors?;
+        let last_dim = input.rank() - 1;
+        Tensor::cat(&tensors, last_dim)
+    }
+}
+```
+
+This iterates over the number of heads that the user specifies and creates an attention later for each. It then calls each attention layers forward method and takes in the input in order to calculate the query key and values matrices.
+
+And we can call it like this:
+
+```rust
+    let mha = MultiHeadAttentionWrapper::new(d_in, d_out, device, context_length, 0.0, 2, None)?;
+
+    let cv = mha.forward(&batch)?;
+```
