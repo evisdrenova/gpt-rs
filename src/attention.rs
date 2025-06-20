@@ -1,7 +1,7 @@
 use candle_core::{Device, Error, Tensor};
 
 use crate::layers::{Dropout, Linear};
-
+use crate::module_list::ModuleList;
 /*
 
 TODOs
@@ -12,7 +12,7 @@ TODOs
 */
 
 pub struct MultiHeadAttentionWrapper {
-    pub heads: usize,
+    pub heads: ModuleList<CausalAttention>,
 }
 
 impl MultiHeadAttentionWrapper {
@@ -27,26 +27,26 @@ impl MultiHeadAttentionWrapper {
     ) -> Result<Self, Error> {
         let bias = bias.unwrap_or(false);
 
-        // create q,k,v matrices and apply dropout
-        let w_query = Linear::new(d_in, d_out, bias, &device)?;
-        let w_key = Linear::new(d_in, d_out, bias, &device)?;
-        let w_value = Linear::new(d_in, d_out, bias, &device)?;
-        let dropout = Dropout::new(dropout);
+        let mut list: ModuleList<CausalAttention> = ModuleList::new();
 
-        // apply causal mask
-        let mask = Self::create_causal_mask(context_length, &device)?;
+        for _ in 0..num_heads {
+            let ca =
+                CausalAttention::new(d_in, d_out, &device, context_length, dropout, Some(bias))?;
 
-        let heads = for _ in num_heads {
-            
-        };
+            list.push(ca)
+        }
 
-        Ok(MultiHeadAttentionWrapper { heads })
+        Ok(MultiHeadAttentionWrapper { heads: list })
     }
 
     pub fn forward(&self, input: &Tensor) -> Result<Tensor, Error> {
-        let tensors = Tensor::cat(args, dim)?;
+        //iterate over heads and call forward on each head
+        let tensors: Result<Vec<Tensor>, Error> =
+            self.heads.iter().map(|h| h.forward(input)).collect();
 
-        Ok(tensors)
+        let tensors = tensors?;
+        let last_dim = input.rank() - 1;
+        Tensor::cat(&tensors, last_dim)
     }
 }
 
@@ -62,7 +62,7 @@ impl CausalAttention {
     pub fn new(
         d_in: usize,
         d_out: usize,
-        device: Device,
+        device: &Device,
         context_length: usize,
         dropout: f32,
         bias: Option<bool>,
@@ -73,7 +73,7 @@ impl CausalAttention {
         let w_query = Linear::new(d_in, d_out, bias, &device)?;
         let w_key = Linear::new(d_in, d_out, bias, &device)?;
         let w_value = Linear::new(d_in, d_out, bias, &device)?;
-        let dropout = Dropout::new(dropout);
+        let dropout_layer = Dropout::new(dropout);
 
         // apply causal mask
         let mask = Self::create_causal_mask(context_length, &device)?;
@@ -82,7 +82,7 @@ impl CausalAttention {
             w_query,
             w_key,
             w_value,
-            dropout,
+            dropout: dropout_layer,
             mask,
         })
     }

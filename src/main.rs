@@ -55,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let context_length = batch.shape().dims()[1];
 
-    let nn_layer = CausalAttention::new(d_in, d_out, device, context_length, 0.0, None)?;
+    let nn_layer = CausalAttention::new(d_in, d_out, &device, context_length, 0.0, None)?;
 
     let ca = CausalAttention::forward(&nn_layer, &batch)?;
 

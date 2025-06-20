@@ -1,3 +1,7 @@
+use candle_core::{Error, Tensor};
+
+use crate::{attention::CausalAttention, layers::Linear};
+
 pub trait Module {
     fn forward(&self, input: &Tensor) -> Result<Tensor, Error>;
 }
@@ -75,13 +79,6 @@ impl<T: Module> ModuleList<T> {
     }
 }
 
-// Implement IndexMut trait for convenient mutable access
-impl<T: Module> std::ops::IndexMut<usize> for ModuleList<T> {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.layers[index]
-    }
-}
-
 // Implement IntoIterator for owned iteration
 impl<T: Module> IntoIterator for ModuleList<T> {
     type Item = T;
@@ -123,14 +120,5 @@ impl Module for Linear {
     fn forward(&self, input: &Tensor) -> Result<Tensor, Error> {
         // Your existing Linear forward implementation
         self.forward(input)
-    }
-}
-
-pub type DynModuleList = ModuleList<Box<dyn Module>>;
-
-impl DynModuleList {
-    /// Add any module that implements Module
-    pub fn push_boxed<T: Module + 'static>(&mut self, module: T) {
-        self.push(Box::new(module));
     }
 }
