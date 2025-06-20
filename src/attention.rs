@@ -49,13 +49,13 @@ impl CausalAttention {
     }
 
     pub fn forward(&self, input: &Tensor) -> Result<Tensor, Error> {
-        // Handle both 2D [num_tokens, d_in] and 3D [batch, num_tokens, d_in]
-        let input_shape = input.shape().dims();
+        let input_shape: &[usize] = input.shape().dims();
 
-        let (batch_size, num_tokens) = if input_shape.len() == 3 {
-            (input_shape[0], input_shape[1])
+        // check if there are batches
+        let num_tokens: usize = if input_shape.len() == 3 {
+            input_shape[1]
         } else if input_shape.len() == 2 {
-            (1, input_shape[0]) // Treat 2D as batch_size=1
+            input_shape[0]
         } else {
             return Err(Error::Msg("Input must be 2D or 3D tensor".into()));
         };
@@ -111,81 +111,6 @@ impl CausalAttention {
         Ok((queries, keys, values))
     }
 
-    pub fn get_weights(&self) -> (&Tensor, &Tensor, &Tensor) {
-        (
-            &self.w_query.weight,
-            &self.w_key.weight,
-            &self.w_value.weight,
-        )
-    }
-
-    // needs work and optimization - simple implementation for now
-    pub fn update_weights(
-        &mut self,
-        w_query: Linear,
-        w_key: Linear,
-        w_value: Linear,
-    ) -> Result<(), Error> {
-        self.w_query = w_query;
-        self.w_key = w_key;
-        self.w_value = w_value;
-        Ok(())
-    }
-
-    pub fn compute_attention_scores(inputs: &Tensor, query: &Tensor) -> Result<Tensor, Error> {
-        // compute dot product
-        let attention_scores = inputs.matmul(&query.unsqueeze(1)?)?;
-        let scores_flat = attention_scores.flatten_all()?;
-
-        Ok(scores_flat)
-    }
-
-    pub fn compute_attention_scores_matrix(inputs: &Tensor) -> Result<Tensor, Error> {
-        let seq_len = inputs.shape().dims()[0];
-        let mut scores_vec: Vec<f32> = Vec::new();
-        for i in 0..seq_len {
-            let x_i = inputs.get(i)?;
-            for j in 0..seq_len {
-                let x_j = inputs.get(j)?;
-                let dot_product = (&x_i * &x_j)?.sum_all()?.to_scalar::<f32>()?;
-
-                scores_vec.push(dot_product);
-            }
-        }
-
-        let attn_scores = Tensor::from_vec(scores_vec, (seq_len, seq_len), inputs.device())?;
-        Ok(attn_scores)
-    }
-
-    // computes the context vector for a single query or index in an input
-    pub fn compute_single_context_vector(
-        inputs: &Tensor,
-        attention_weights: &Tensor,
-    ) -> Result<Tensor, Error> {
-        // Weighted sum: sum over i of (attention_weights[i] * inputs[i])
-
-        // Reshape attention weights from [seq_len] to [1, seq_len] for matrix multiplication
-        let weights_reshaped = attention_weights.unsqueeze(0)?;
-
-        // Matrix multiplication: [1, seq_len] × [seq_len, hidden_dim] = [1, hidden_dim]
-        let context_matrix = weights_reshaped.matmul(inputs)?;
-
-        // Flatten to get [hidden_dim] vector
-        let context_vector = context_matrix.flatten_all()?;
-
-        Ok(context_vector)
-    }
-
-    // computes context vector all queries at once or an entire input
-    pub fn compute_context_matrix(
-        inputs: &Tensor,
-        attention_weights: &Tensor,
-    ) -> Result<Tensor, Error> {
-        let context_vectors = attention_weights.matmul(inputs)?;
-
-        Ok(context_vectors)
-    }
-
     pub fn softmax(input: &Tensor, dim: Option<usize>) -> Result<Tensor, Error> {
         // Softmax formula: softmax(x_i) = exp(x_i) / sum(exp(x_j) for all j)
 
@@ -214,54 +139,11 @@ impl CausalAttention {
         Ok(softmax_result)
     }
 
-    pub fn compute_attention(inputs: &Tensor, query: &Tensor) -> Result<(Tensor, Tensor), Error> {
-        // Step 1: Compute attention scores
-        let scores = Self::compute_attention_scores(inputs, query)?;
-
-        // Step 2: Apply softmax to get attention weights
-        let weights = Self::softmax(&scores, Some(1))?;
-
-        // Step 3: Compute context vector
-        let context = Self::compute_context_matrix(inputs, &weights)?;
-
-        Ok((weights, context))
-    }
-
-    // adds in teh causal mask to the attention scores
-    pub fn apply_causal_mask(attn_scores: &Tensor) -> Result<Tensor, Error> {
-        let device = attn_scores.device();
-        let shape = attn_scores.shape().dims();
-        assert_eq!(shape.len(), 2, "expected [L, L] attn_scores");
-        let L = shape[0];
-
-        // 1) build float mask [L, L] where j > i → 1.0, else 0.0
-        let mut mask_data = Vec::with_capacity(L * L);
-        for i in 0..L {
-            for j in 0..L {
-                mask_data.push(if j > i { 1.0_f32 } else { 0.0_f32 });
-            }
-        }
-        let float_mask = Tensor::from_vec(mask_data, (L, L), device)?;
-
-        // 2) convert to bool mask via comparison
-        //    (float_mask > 0.0) yields a boolean Tensor
-        let bool_mask = float_mask.gt(0.0)?;
-
-        // 3) build a -inf tensor of the same shape & dtype as attn_scores
-        let neg_inf = Tensor::zeros_like(attn_scores)?.affine(0.0, f64::NEG_INFINITY)?;
-
-        // 4) where(bool_mask) use -inf else original
-        let masked = bool_mask.where_cond(&neg_inf, attn_scores)?;
-
-        Ok(masked)
-    }
-
     fn apply_causal_mask_slice(
         &self,
         attn_scores: &Tensor,
         num_tokens: usize,
     ) -> Result<Tensor, Error> {
-        let device = attn_scores.device();
         let shape = attn_scores.shape().dims();
 
         // Slice the pre-computed mask to the current sequence length
