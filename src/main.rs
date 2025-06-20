@@ -7,6 +7,7 @@ mod attention;
 mod embedding;
 mod file_operations;
 mod layers;
+mod module_list;
 mod rng;
 mod simple_tokenizer;
 

@@ -11,6 +11,45 @@ TODOs
 
 */
 
+pub struct MultiHeadAttentionWrapper {
+    pub heads: usize,
+}
+
+impl MultiHeadAttentionWrapper {
+    pub fn new(
+        d_in: usize,
+        d_out: usize,
+        device: Device,
+        context_length: usize,
+        dropout: f32,
+        num_heads: usize,
+        bias: Option<bool>,
+    ) -> Result<Self, Error> {
+        let bias = bias.unwrap_or(false);
+
+        // create q,k,v matrices and apply dropout
+        let w_query = Linear::new(d_in, d_out, bias, &device)?;
+        let w_key = Linear::new(d_in, d_out, bias, &device)?;
+        let w_value = Linear::new(d_in, d_out, bias, &device)?;
+        let dropout = Dropout::new(dropout);
+
+        // apply causal mask
+        let mask = Self::create_causal_mask(context_length, &device)?;
+
+        let heads = for _ in num_heads {
+            
+        };
+
+        Ok(MultiHeadAttentionWrapper { heads })
+    }
+
+    pub fn forward(&self, input: &Tensor) -> Result<Tensor, Error> {
+        let tensors = Tensor::cat(args, dim)?;
+
+        Ok(tensors)
+    }
+}
+
 pub struct CausalAttention {
     pub w_query: Linear,
     pub w_key: Linear,
@@ -121,16 +160,13 @@ impl CausalAttention {
             Some(dimension) => {
                 // Row-wise (or dimension-wise) softmax
                 // Sum along the specified dimension while keeping dimensions
-                let exp_sum = exp_values.sum_keepdim(dimension)?; // Use 'dimension', not 'dim'
-
+                let exp_sum = exp_values.sum_keepdim(dimension)?;
                 // Normalize: divide each element by the sum along that dimension
                 exp_values.broadcast_div(&exp_sum)?
             }
             None => {
-                // Global softmax (original behavior)
                 // Sum all exponential values
                 let exp_sum = exp_values.sum_all()?;
-
                 // Normalize: divide each exp value by the total sum
                 exp_values.broadcast_div(&exp_sum)?
             }
@@ -138,7 +174,7 @@ impl CausalAttention {
 
         Ok(softmax_result)
     }
-
+    // this could probably be made way more efficieint like we shouldnt have to do an affine transform here
     fn apply_causal_mask_slice(
         &self,
         attn_scores: &Tensor,

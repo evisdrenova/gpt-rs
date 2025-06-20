@@ -1613,3 +1613,7 @@ Tensor[[6, 6], f32]]
 You can see the dropout example where we randomly drop out values from the example tensor we create. Then we apply the drop out to the attention weights.
 
 Nice!
+
+# Implementing multi head attention
+
+Like we did in the single attention head implementation, the multi head attention mechanism is just multiple single headed attention mechanisms running in parallel.
