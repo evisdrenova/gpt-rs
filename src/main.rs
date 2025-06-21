@@ -49,7 +49,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let device = Device::Cpu;
     let d_in = 3;
-    let d_out = 2;
+    let d_out = 1;
 
     let batch = Tensor::stack(&[&inputs, &inputs], 0)?;
 
@@ -66,6 +66,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cv = mha.forward(&batch)?;
 
     println!("sv:{:?}", cv);
+
+    let values: Vec<Vec<Vec<f32>>> = cv.to_vec3()?; // For 3D tensor
+
+    println!("Tensor values: {:?}", values);
 
     Ok(())
 }
