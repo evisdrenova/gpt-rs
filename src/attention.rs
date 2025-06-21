@@ -78,7 +78,7 @@ impl MultiHeadAttention {
     pub fn forward(&self, input: &Tensor) -> Result<Tensor, Error> {
         let input_shape: &[usize] = input.shape().dims();
 
-        // check if there are batches
+        // parse input dimensions so we can use them later for reshaping
         let (b, num_tokens) = if input_shape.len() == 3 {
             (input_shape[0], input_shape[1])
         } else if input_shape.len() == 2 {
@@ -87,19 +87,27 @@ impl MultiHeadAttention {
             return Err(Error::Msg("Input must be 2D or 3D tensor".into()));
         };
 
-        // feed forward on the linear layer to create matrices
+        /* Apply linear transformations to create queries, keys, and values
+        Input shape: [batch, seq_len, d_in]
+        Output shape: [batch, seq_len, d_out] for each Q, K, V*/
+
         let (mut queries, mut keys, mut values) = self.create_qkv_matrices(input)?;
 
-        //reshapes the matrices by adding a num_heads dimension
+        // split out attention heads for parallel processing
+        // Before: [batch, seq_len, d_out]
+        // After: [batch, seq_len, num_heads, head_dim]
         keys = keys.reshape(&[b, num_tokens, self.num_heads, self.head_dim])?;
         queries = queries.reshape(&[b, num_tokens, self.num_heads, self.head_dim])?;
         values = values.reshape(&[b, num_tokens, self.num_heads, self.head_dim])?;
 
-        // transpose the matrices to a 1D tensor
+        // group all attention heads together so we can process them in parallel with a  single matrix operation instead of looping
+        // Before: [batch, seq_len, num_heads, head_dim]
+        // After: [batch, num_heads, seq_len, head_dim]
         keys = keys.transpose(1, 2)?;
         queries = queries.transpose(1, 2)?;
         values = values.transpose(1, 2)?;
 
+        // compute the attention scores
         let keys_t = keys.transpose(2, 3)?;
         let attn_scores = queries.matmul(&keys_t)?;
 
@@ -119,8 +127,8 @@ impl MultiHeadAttention {
         // Compute context vectors
         let context_vecs = attn_weights.matmul(&values)?;
 
+        // transpose and concat all heads back into a single representation
         let context_vecs = context_vecs.transpose(1, 2)?;
-
         let context_vecs = context_vecs
             .reshape(&[b, num_tokens, self.d_out])?
             .contiguous()?;
