@@ -96,34 +96,18 @@ impl MultiHeadAttention {
         queries = queries.reshape(&[b, num_tokens, self.num_heads, self.head_dim])?;
         values = values.reshape(&[b, num_tokens, self.num_heads, self.head_dim])?;
 
-        // PyTorch: keys.transpose(1, 2) - swap dimensions 1 and 2
-        let keys_t = if keys.rank() == 3 {
-            keys.transpose(1, 2)?
-        } else {
-            keys.t()?
-        };
+        keys = keys.transpose(1, 2)?;
+        queries = queries.transpose(1, 2)?;
+        values = values.transpose(1, 2)?;
 
-        let queries_t = if queries.rank() == 3 {
-            queries.transpose(1, 2)?
-        } else {
-            queries.t()?
-        };
-
-        let values_t = if values.rank() == 3 {
-            values.transpose(1, 2)?
-        } else {
-            values.t()?
-        };
-
-        // computes the dot product for each head
-        let attn_scores = queries_t.matmul(&keys_t)?;
+        let keys_t = keys.transpose(2, 3)?;
+        let attn_scores = queries.matmul(&keys_t)?;
 
         // Apply causal mask for the current num_tokens
         let masked_scores = self.apply_causal_mask_slice(&attn_scores, num_tokens)?;
 
-        // Scale by sqrt(d_k)
-        let d_k = keys.dim(keys.rank() - 1)? as f64;
-        let scale = 1.0 / d_k.sqrt();
+        // scale scores to make up for dropout mask
+        let scale = 1.0 / (self.head_dim as f64).sqrt();
         let scaled_scores = (masked_scores * scale)?;
 
         // Apply softmax
@@ -133,15 +117,15 @@ impl MultiHeadAttention {
         let attn_weights = self.dropout.forward(&attn_weights)?;
 
         // Compute context vectors
-        let mut context_vecs = attn_weights.matmul(&values_t)?;
+        let context_vecs = attn_weights.matmul(&values)?;
 
-        context_vecs.transpose(1, 2);
+        let context_vecs = context_vecs.transpose(1, 2)?;
 
         context_vecs
             .reshape(&[b, num_tokens, self.d_out])?
             .contiguous();
 
-        context_vecs = self.out_proj.forward(&context_vecs)?;
+        let context_vecs = self.out_proj.forward(&context_vecs)?;
 
         Ok(context_vecs)
     }
