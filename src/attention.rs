@@ -5,48 +5,134 @@ use crate::module_list::ModuleList;
 /*
 
 TODOs
-
 1. when we do auto-grad, we will have to update this to store the computed q,k,v tensors
 2. creat a layer trait that all layers implement
-
 */
 
-pub struct MultiHeadAttentionWrapper {
-    pub heads: ModuleList<CausalAttention>,
+pub struct MultiHeadAttention {
+    pub w_query: Linear,
+    pub w_key: Linear,
+    pub w_value: Linear,
+    pub dropout: Dropout,
+    pub mask: Tensor,
+    pub num_heads: usize,
+    pub head_dim: usize,
+    pub out_proj: Linear,
 }
 
-impl MultiHeadAttentionWrapper {
+impl MultiHeadAttention {
     pub fn new(
         d_in: usize,
         d_out: usize,
-        device: Device,
         context_length: usize,
         dropout: f32,
         num_heads: usize,
         bias: Option<bool>,
+        device: Device,
     ) -> Result<Self, Error> {
-        let bias = bias.unwrap_or(false);
-
-        let mut list: ModuleList<CausalAttention> = ModuleList::new();
-
-        for _ in 0..num_heads {
-            let ca =
-                CausalAttention::new(d_in, d_out, &device, context_length, dropout, Some(bias))?;
-
-            list.push(ca)
+        if d_out % num_heads == 0 {
+            return Err(Error::Msg("d_out must be divisble by num_heads".into()));
         }
 
-        Ok(MultiHeadAttentionWrapper { heads: list })
+        let head_dim = d_out % num_heads;
+
+        let bias = bias.unwrap_or(false);
+
+        // create q,k,v matrices and apply dropout
+        let w_query = Linear::new(d_in, d_out, bias, &device)?;
+        let w_key = Linear::new(d_in, d_out, bias, &device)?;
+        let w_value = Linear::new(d_in, d_out, bias, &device)?;
+
+        let out_proj = Linear::new(d_out, d_out, bias, &device);
+
+        let dropout_layer = Dropout::new(dropout);
+
+        // apply causal mask
+        let mask = Self::create_causal_mask(context_length, &device)?;
+
+        Ok(MultiHeadAttention {
+            w_query,
+            w_key,
+            w_value,
+            dropout: dropout_layer,
+            mask,
+            num_heads,
+            head_dim,
+            out_proj: out_proj?,
+        })
+    }
+
+    // pub fn forward(&self, input: &Tensor) -> Result<Tensor, Error> {
+    //     let mut list: ModuleList<CausalAttention> = ModuleList::new();
+
+    //     for _ in 0..self.num_heads {
+    //         let ca =
+    //             CausalAttention::new(d_in, d_out, context_length, dropout, Some(bias), &device)?;
+
+    //         list.push(ca)
+    //     }
+    //     //iterate over heads and call forward on each head
+    //     let tensors: Result<Vec<Tensor>, Error> =
+    //         self.heads.iter().map(|h| h.forward(input)).collect();
+
+    //     let tensors = tensors?;
+    //     let last_dim = input.rank() - 1;
+    //     Tensor::cat(&tensors, last_dim)
+    // }
+
+    fn create_causal_mask(context_length: usize, device: &Device) -> Result<Tensor, Error> {
+        let mut mask_data = Vec::with_capacity(context_length * context_length);
+
+        for i in 0..context_length {
+            for j in 0..context_length {
+                mask_data.push(if j > i { 1.0f32 } else { 0.0f32 });
+            }
+        }
+
+        Tensor::from_vec(mask_data, (context_length, context_length), device)
     }
 
     pub fn forward(&self, input: &Tensor) -> Result<Tensor, Error> {
-        //iterate over heads and call forward on each head
-        let tensors: Result<Vec<Tensor>, Error> =
-            self.heads.iter().map(|h| h.forward(input)).collect();
+        let input_shape: &[usize] = input.shape().dims();
 
-        let tensors = tensors?;
-        let last_dim = input.rank() - 1;
-        Tensor::cat(&tensors, last_dim)
+        // check if there are batches
+        let num_tokens: usize = if input_shape.len() == 3 {
+            input_shape[1]
+        } else if input_shape.len() == 2 {
+            input_shape[0]
+        } else {
+            return Err(Error::Msg("Input must be 2D or 3D tensor".into()));
+        };
+
+        let (queries, keys, values) = self.create_qkv_matrices(input)?;
+
+        // PyTorch: keys.transpose(1, 2) - swap dimensions 1 and 2
+        let keys_t = if keys.rank() == 3 {
+            keys.transpose(1, 2)? // [batch, d_in, num_tokens]
+        } else {
+            keys.t()? // [d_in, num_tokens]
+        };
+
+        let attn_scores = queries.matmul(&keys_t)?;
+
+        // Apply causal mask for the current num_tokens
+        let masked_scores = self.apply_causal_mask_slice(&attn_scores, num_tokens)?;
+
+        // Scale by sqrt(d_k)
+        let d_k = keys.dim(keys.rank() - 1)? as f64;
+        let scale = 1.0 / d_k.sqrt();
+        let scaled_scores = (masked_scores * scale)?;
+
+        // Apply softmax
+        let attn_weights = Self::softmax(&scaled_scores, Some(scaled_scores.rank() - 1))?;
+
+        // Apply dropout
+        let attn_weights = self.dropout.forward(&attn_weights)?;
+
+        // Compute context vectors
+        let context_vecs = attn_weights.matmul(&values)?;
+
+        Ok(context_vecs)
     }
 }
 
@@ -62,10 +148,10 @@ impl CausalAttention {
     pub fn new(
         d_in: usize,
         d_out: usize,
-        device: &Device,
         context_length: usize,
         dropout: f32,
         bias: Option<bool>,
+        device: &Device,
     ) -> Result<Self, Error> {
         let bias = bias.unwrap_or(false);
 
@@ -128,18 +214,6 @@ impl CausalAttention {
         let context_vecs = attn_weights.matmul(&values)?;
 
         Ok(context_vecs)
-    }
-
-    fn create_causal_mask(context_length: usize, device: &Device) -> Result<Tensor, Error> {
-        let mut mask_data = Vec::with_capacity(context_length * context_length);
-
-        for i in 0..context_length {
-            for j in 0..context_length {
-                mask_data.push(if j > i { 1.0f32 } else { 0.0f32 });
-            }
-        }
-
-        Tensor::from_vec(mask_data, (context_length, context_length), device)
     }
 
     pub fn create_qkv_matrices(&self, inputs: &Tensor) -> Result<(Tensor, Tensor, Tensor), Error> {

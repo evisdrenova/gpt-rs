@@ -1,7 +1,7 @@
 use candle_core::{DType, Device, Error, Tensor};
 use file_operations::{create_dataloader_v1, load_file};
 
-use crate::attention::{CausalAttention, MultiHeadAttentionWrapper};
+use crate::attention::{CausalAttention, MultiHeadAttention};
 
 mod attention;
 mod embedding;
@@ -55,13 +55,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let context_length = batch.shape().dims()[1];
 
-    let nn_layer = CausalAttention::new(d_in, d_out, &device, context_length, 0.0, None)?;
+    let nn_layer = CausalAttention::new(d_in, d_out, context_length, 0.0, None, &device)?;
 
     let ca = CausalAttention::forward(&nn_layer, &batch)?;
 
     println!("ca:{:?}", ca);
 
-    let mha = MultiHeadAttentionWrapper::new(d_in, d_out, device, context_length, 0.0, 2, None)?;
+    let mha = MultiHeadAttention::new(d_in, d_out, context_length, 0.0, 2, None, device)?;
 
     let cv = mha.forward(&batch)?;
 
