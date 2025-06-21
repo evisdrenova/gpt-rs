@@ -49,13 +49,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let device = Device::Cpu;
     let d_in = 3;
-    let d_out = 1;
+    let d_out = 2;
 
     let batch = Tensor::stack(&[&inputs, &inputs], 0)?;
 
     let context_length = batch.shape().dims()[1];
 
-    let nn_layer = MultiHeadAttention::new(d_in, d_out, context_length, 0.0, 3, None, device)?;
+    let nn_layer = MultiHeadAttention::new(d_in, d_out, context_length, 0.0, 2, None, device)?;
 
     let ca = MultiHeadAttention::forward(&nn_layer, &batch)?;
 

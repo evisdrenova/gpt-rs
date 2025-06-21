@@ -103,12 +103,12 @@ impl MultiHeadAttention {
         // group all attention heads together so we can process them in parallel with a  single matrix operation instead of looping
         // Before: [batch, seq_len, num_heads, head_dim]
         // After: [batch, num_heads, seq_len, head_dim]
-        keys = keys.transpose(1, 2)?;
-        queries = queries.transpose(1, 2)?;
-        values = values.transpose(1, 2)?;
+        keys = keys.transpose(1, 2)?.contiguous()?;
+        queries = queries.transpose(1, 2)?.contiguous()?;
+        values = values.transpose(1, 2)?.contiguous()?;
 
         // compute the attention scores
-        let keys_t = keys.transpose(2, 3)?;
+        let keys_t = keys.transpose(2, 3)?.contiguous()?;
         let attn_scores = queries.matmul(&keys_t)?;
 
         // Apply causal mask for the current num_tokens
