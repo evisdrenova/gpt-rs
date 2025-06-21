@@ -1,7 +1,6 @@
 use candle_core::{Device, Error, Tensor};
 
 use crate::layers::{Dropout, Linear};
-use crate::module_list::ModuleList;
 /*
 
 TODOs
@@ -147,7 +146,18 @@ impl MultiHeadAttention {
         let shape = attn_scores.shape().dims();
 
         // Slice the pre-computed mask to the current sequence length
-        let mask_slice = if shape.len() == 3 {
+        let mask_slice = if shape.len() == 4 {
+            let batch_size = shape[0];
+            let num_heads = shape[1];
+            let mask_2d = self
+                .mask
+                .narrow(0, 0, num_tokens)?
+                .narrow(1, 0, num_tokens)?;
+            mask_2d
+                .unsqueeze(0)?
+                .unsqueeze(0)?
+                .expand(&[batch_size, num_heads, num_tokens, num_tokens])?
+        } else if shape.len() == 3 {
             // For 3D: [batch, num_tokens, num_tokens]
             let batch_size = shape[0];
             let mask_2d = self
@@ -196,84 +206,3 @@ impl MultiHeadAttention {
         Ok(softmax_result)
     }
 }
-
-// pub struct CausalAttention {
-//     pub w_query: Linear,
-//     pub w_key: Linear,
-//     pub w_value: Linear,
-//     pub dropout: Dropout,
-//     pub mask: Tensor,
-// }
-
-// impl CausalAttention {
-//     pub fn new(
-//         d_in: usize,
-//         d_out: usize,
-//         context_length: usize,
-//         dropout: f32,
-//         bias: Option<bool>,
-//         device: &Device,
-//     ) -> Result<Self, Error> {
-//         let bias = bias.unwrap_or(false);
-
-//         // create q,k,v matrices and apply dropout
-//         let w_query = Linear::new(d_in, d_out, bias, &device)?;
-//         let w_key = Linear::new(d_in, d_out, bias, &device)?;
-//         let w_value = Linear::new(d_in, d_out, bias, &device)?;
-//         let dropout_layer = Dropout::new(dropout);
-
-//         // apply causal mask
-//         let mask = Self::create_causal_mask(context_length, &device)?;
-
-//         Ok(CausalAttention {
-//             w_query,
-//             w_key,
-//             w_value,
-//             dropout: dropout_layer,
-//             mask,
-//         })
-//     }
-
-//     pub fn forward(&self, input: &Tensor) -> Result<Tensor, Error> {
-//         let input_shape: &[usize] = input.shape().dims();
-
-//         // check if there are batches
-//         let num_tokens: usize = if input_shape.len() == 3 {
-//             input_shape[1]
-//         } else if input_shape.len() == 2 {
-//             input_shape[0]
-//         } else {
-//             return Err(Error::Msg("Input must be 2D or 3D tensor".into()));
-//         };
-
-//         let (queries, keys, values) = self.create_qkv_matrices(input)?;
-
-//         // PyTorch: keys.transpose(1, 2) - swap dimensions 1 and 2
-//         let keys_t = if keys.rank() == 3 {
-//             keys.transpose(1, 2)? // [batch, d_in, num_tokens]
-//         } else {
-//             keys.t()? // [d_in, num_tokens]
-//         };
-
-//         let attn_scores = queries.matmul(&keys_t)?;
-
-//         // Apply causal mask for the current num_tokens
-//         let masked_scores = self.apply_causal_mask_slice(&attn_scores, num_tokens)?;
-
-//         // Scale by sqrt(d_k)
-//         let d_k = keys.dim(keys.rank() - 1)? as f64;
-//         let scale = 1.0 / d_k.sqrt();
-//         let scaled_scores = (masked_scores * scale)?;
-
-//         // Apply softmax
-//         let attn_weights = Self::softmax(&scaled_scores, Some(scaled_scores.rank() - 1))?;
-
-//         // Apply dropout
-//         let attn_weights = self.dropout.forward(&attn_weights)?;
-
-//         // Compute context vectors
-//         let context_vecs = attn_weights.matmul(&values)?;
-
-//         Ok(context_vecs)
-//     }
-// }

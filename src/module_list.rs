@@ -1,6 +1,6 @@
 use candle_core::{Error, Tensor};
 
-use crate::{attention::CausalAttention, layers::Linear};
+use crate::{attention::MultiHeadAttention, layers::Linear};
 
 pub trait Module {
     fn forward(&self, input: &Tensor) -> Result<Tensor, Error>;
@@ -109,7 +109,7 @@ impl<'a, T: Module> IntoIterator for &'a mut ModuleList<T> {
     }
 }
 
-impl Module for CausalAttention {
+impl Module for MultiHeadAttention {
     fn forward(&self, input: &Tensor) -> Result<Tensor, Error> {
         // Your existing forward implementation
         self.forward(input)
