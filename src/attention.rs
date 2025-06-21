@@ -95,6 +95,7 @@ impl MultiHeadAttention {
         queries = queries.reshape(&[b, num_tokens, self.num_heads, self.head_dim])?;
         values = values.reshape(&[b, num_tokens, self.num_heads, self.head_dim])?;
 
+        // transpose the matrices to a 1D tensor
         keys = keys.transpose(1, 2)?;
         queries = queries.transpose(1, 2)?;
         values = values.transpose(1, 2)?;
@@ -120,10 +121,11 @@ impl MultiHeadAttention {
 
         let context_vecs = context_vecs.transpose(1, 2)?;
 
-        context_vecs
+        let context_vecs = context_vecs
             .reshape(&[b, num_tokens, self.d_out])?
-            .contiguous();
+            .contiguous()?;
 
+        // Apply output projection
         let context_vecs = self.out_proj.forward(&context_vecs)?;
 
         Ok(context_vecs)
