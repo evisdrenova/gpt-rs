@@ -96,13 +96,26 @@ impl MultiHeadAttention {
         let input_shape: &[usize] = input.shape().dims();
 
         // check if there are batches
-        let num_tokens: usize = if input_shape.len() == 3 {
-            input_shape[1]
+        let (b, num_tokens) = if input_shape.len() == 3 {
+            (input_shape[0], input_shape[1]) // [batch, seq_len, d_in]
         } else if input_shape.len() == 2 {
-            input_shape[0]
+            (1, input_shape[0]) // [seq_len, d_in] - treat as batch size 1
         } else {
             return Err(Error::Msg("Input must be 2D or 3D tensor".into()));
         };
+
+        let mut queries = self.w_query.forward(input)?;
+        let mut keys = self.w_key.forward(input)?;
+        let mut values = self.w_value.forward(input)?;
+
+        //reshapes the matrices by adding a num_heads dimension
+        keys = keys.reshape(&[b, num_tokens, self.num_heads, self.head_dim])?;
+
+        let mut queries = self.w_query.forward(input)?;
+        queries = queries.reshape(&[b, num_tokens, self.num_heads, self.head_dim])?;
+
+        let mut values = self.w_value.forward(input)?;
+        values = values.reshape(&[b, num_tokens, self.num_heads, self.head_dim])?;
 
         let (queries, keys, values) = self.create_qkv_matrices(input)?;
 
@@ -133,6 +146,14 @@ impl MultiHeadAttention {
         let context_vecs = attn_weights.matmul(&values)?;
 
         Ok(context_vecs)
+    }
+
+    pub fn create_qkv_matrices(&self, inputs: &Tensor) -> Result<(Tensor, Tensor, Tensor), Error> {
+        let queries = self.w_query.forward(inputs)?;
+        let keys = self.w_key.forward(inputs)?;
+        let values = self.w_value.forward(inputs)?;
+
+        Ok((queries, keys, values))
     }
 }
 
