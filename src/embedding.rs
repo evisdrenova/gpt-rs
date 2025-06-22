@@ -9,7 +9,7 @@ pub struct Embedding {
 // then for a given batch of tokenIds, we can index-select along the 0th dimension of the embedding-weight matrix
 impl Embedding {
     // creates a weight matrix with mean 0, std of 1 and shape[vocab_size*output_dim
-    pub fn new(vocab_size: i64, output_dim: i64, device: Device) -> Result<Embedding> {
+    pub fn new(vocab_size: usize, output_dim: usize, device: Device) -> Result<Embedding> {
         let weights = Tensor::randn(
             0.0f32,
             1.0f32,

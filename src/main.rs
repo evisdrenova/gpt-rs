@@ -1,4 +1,4 @@
-use candle_core::{DType, Device, Error, Tensor};
+use candle_core::{Device, Tensor};
 use file_operations::{create_dataloader_v1, load_file};
 
 use crate::attention::MultiHeadAttention;
@@ -11,6 +11,8 @@ mod module_list;
 mod rng;
 mod simple_tokenizer;
 
+mod gpt;
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let file_name = "the-verdict.txt";
 
@@ -21,9 +23,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let stride = 4;
     let shuffle = false;
     let drop_last = true;
-    let context_length = 4;
-    let vocab_size: i64 = 50267;
+    let context_length = 1024;
+    let vocab_size: i64 = 50257;
     let output_dim: i64 = 3;
+    let emb_dim = 768;
+    let n_heads = 12;
+    let n_layers = 12;
+    let drop_rate: f32 = 0.1;
+    let qkv_bias = false;
 
     let dataloader = create_dataloader_v1(
         &raw_text,

@@ -5,7 +5,7 @@ use crate::layers::{Dropout, Linear};
 
 TODOs
 1. when we do auto-grad, we will have to update this to store the computed q,k,v tensors
-2. creat a layer trait that all layers implement
+2. creat a moduel layer  trait that all layers implement
 */
 
 pub struct MultiHeadAttention {
