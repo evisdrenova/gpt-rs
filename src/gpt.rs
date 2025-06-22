@@ -1,5 +1,5 @@
 use candle_core::{Device, Error, Tensor};
-use candle_nn::{LayerNorm, Sequential};
+use candle_nn::{Module, Sequential, seq};
 
 use crate::{
     embedding::Embedding,
@@ -22,48 +22,67 @@ pub struct GPT {
     pub tok_emb: Embedding,
     pub pos_emb: Embedding,
     pub drop_emb: Dropout,
-    pub trf_blocks: usize,
-    pub final_norm: LayerNorm,
+    pub trf_blocks: Sequential,
+    pub final_norm: DummyLayerNorm,
     pub out_head: Linear,
 }
 
 impl GPT {
-    pub fn new(cfg: GPTConfig) -> Result<Self,Error> {
+    pub fn new(cfg: GPTConfig) -> Result<Self, Error> {
         let device = Device::Cpu;
 
         // create embedding layers
-        let tok_emb = Embedding::new(cfg.vocab_size, cfg.emb_dim, device)?;
-        let pos_emb = Embedding::new(cfg.context_length, cfg.emb_dim, device)?;
+        let tok_emb = Embedding::new(cfg.vocab_size, cfg.emb_dim, device.clone())?;
+        let pos_emb = Embedding::new(cfg.context_length, cfg.emb_dim, device.clone())?;
 
         let drop_emb = Dropout::new(cfg.drop_rate);
-
-
         // creates a list of modules and then connects the inputs to ouputs of the models in a feed forward type of way
-        let trf_blocks = Sequential
 
+        let mut trf_blocks: Sequential = seq();
+        for _ in 0..cfg.n_layers {
+            let block = DummyTransformerBlock::new(&cfg)?;
+            trf_blocks = trf_blocks.add(block);
+        }
 
+        let final_norm = DummyLayerNorm::new(cfg.emb_dim, 0.00001)?;
 
-        Ok(GPT { tok_emb })
+        let out_head = Linear::new(cfg.emb_dim, cfg.vocab_size, false, &device)?;
+
+        Ok(GPT {
+            tok_emb,
+            pos_emb,
+            out_head,
+            drop_emb,
+            trf_blocks,
+            final_norm,
+        })
     }
 }
 
+pub struct DummyTransformerBlock {}
 
-pub struct DummyTransformerModel {
-
+impl DummyTransformerBlock {
+    pub fn new(_cfg: &GPTConfig) -> Result<Self, Error> {
+        Ok(Self {})
+    }
 }
 
-impl DummyTransformerModel {
-    pub fn new(cfg: GPTConfig) -> Result<Self,Error>{Ok(DummyTransformerModel {  })}
-
-    pub fn forward(self, input:Tensor) -> Result<Tensor,Error>{Ok(input)}
+impl Module for DummyTransformerBlock {
+    fn forward(&self, x: &Tensor) -> Result<Tensor, Error> {
+        Ok(x.clone())
+    }
 }
 
-pub struct DummyLayerNorm {
-
-}
+pub struct DummyLayerNorm {}
 
 impl DummyLayerNorm {
-    pub fn new( norm_shape:usize, eps:f32) -> Result<Self,Error>{Ok(DummyLayerNorm {  })}
+    pub fn new(dim: usize, eps: f32) -> Result<Self, Error> {
+        Ok(Self {})
+    }
+}
 
-    pub fn forward(self, input:Tensor) -> Result<Tensor,Error>{Ok(input)}
+impl Module for DummyLayerNorm {
+    fn forward(&self, x: &Tensor) -> Result<Tensor, Error> {
+        Ok(x.clone())
+    }
 }
