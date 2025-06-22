@@ -79,13 +79,7 @@ impl MultiHeadAttention {
         let input_shape: &[usize] = input.shape().dims();
 
         // parse input dimensions so we can use them later for reshaping
-        let (b, num_tokens) = if input_shape.len() == 3 {
-            (input_shape[0], input_shape[1])
-        } else if input_shape.len() == 2 {
-            (1, input_shape[0])
-        } else {
-            return Err(Error::Msg("Input must be 2D or 3D tensor".into()));
-        };
+        let (b, num_tokens) = parse_batch_and_seq(input_shape)?;
 
         /* Apply linear transformations to create queries, keys, and values
         Input shape: [batch, seq_len, d_in]
@@ -214,5 +208,17 @@ impl MultiHeadAttention {
         };
 
         Ok(softmax_result)
+    }
+}
+
+pub fn parse_batch_and_seq(dims: &[usize]) -> Result<(usize, usize), Error> {
+    match dims.len() {
+        1 => Ok((1, dims[0])),
+        2 => Ok((dims[0], dims[1])),
+        3 => Ok((dims[0], dims[1])),
+        _ => Err(Error::Msg(format!(
+            "Expected 1D, 2D or 3D input, got {}D",
+            dims.len()
+        ))),
     }
 }

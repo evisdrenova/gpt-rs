@@ -1,7 +1,9 @@
 use candle_core::{Device, Error, Tensor};
 use candle_nn::{Module, Sequential, seq};
+use rand::seq;
 
 use crate::{
+    attention::parse_batch_and_seq,
     embedding::Embedding,
     layers::{Dropout, Linear},
 };
@@ -56,6 +58,23 @@ impl GPT {
             trf_blocks,
             final_norm,
         })
+    }
+
+    pub fn forward(self, in_indx: Tensor) -> Result<Tensor, Error> {
+        let dims = in_indx.shape().dims();
+
+        let (batch_size, seq_len) = parse_batch_and_seq(dims)?;
+
+        let tok_embeds = self.tok_emb.forward(&in_indx)?;
+        let arrange = Tensor::arange(0f32, seq_len as f32, &Device::Cpu)?;
+        let pos_embeds = self.pos_emb.forward(&arrange)?;
+
+        let mut x = tok_embeds + pos_embeds;
+        x = self.drop_emb.forward(&x.unwrap());
+        x = self.trf_blocks.forward(&x.unwrap());
+        x = self.final_norm.forward(&x.unwrap());
+        let logits = self.out_head.forward(&x.unwrap())?;
+        Ok(logits)
     }
 }
 
