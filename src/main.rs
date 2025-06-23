@@ -112,7 +112,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let model = GPT::new(config)?;
 
-
     let logits = model.forward(batch)?;
     println!("Logits shape: {:?}", logits.shape());
 

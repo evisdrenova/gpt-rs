@@ -69,15 +69,10 @@ impl GPT {
         let arrange = Tensor::arange(0u32, seq_len as u32, &Device::Cpu)?;
 
         let pos_embeds = self.pos_emb.forward(&arrange)?;
-
-        let embeddings = tok_embeds.add(&pos_embeds)?;
-        println!("3");
+        let embeddings = tok_embeds.broadcast_add(&pos_embeds)?;
         let dropped_embeddings = self.drop_emb.forward(&embeddings)?;
-        println!("4");
         let transformer_output = self.trf_blocks.forward(&dropped_embeddings)?;
-        println!("5");
         let normalized_output = self.final_norm.forward(&transformer_output)?;
-        println!("6");
         let logits = self.out_head.forward(&normalized_output)?;
         Ok(logits)
     }
