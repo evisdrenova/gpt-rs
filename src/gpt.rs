@@ -67,16 +67,18 @@ impl GPT {
         let tok_embeds = self.tok_emb.forward(&in_indx)?;
         // we need to output integeres here so that we can use them in the embedding layer
         let arrange = Tensor::arange(0u32, seq_len as u32, &Device::Cpu)?;
+
         let pos_embeds = self.pos_emb.forward(&arrange)?;
-        let mut x = tok_embeds.add(&pos_embeds);
+
+        let embeddings = tok_embeds.add(&pos_embeds)?;
         println!("3");
-        x = self.drop_emb.forward(&x.unwrap());
+        let dropped_embeddings = self.drop_emb.forward(&embeddings)?;
         println!("4");
-        x = self.trf_blocks.forward(&x.unwrap());
+        let transformer_output = self.trf_blocks.forward(&dropped_embeddings)?;
         println!("5");
-        x = self.final_norm.forward(&x.unwrap());
+        let normalized_output = self.final_norm.forward(&transformer_output)?;
         println!("6");
-        let logits = self.out_head.forward(&x.unwrap())?;
+        let logits = self.out_head.forward(&normalized_output)?;
         Ok(logits)
     }
 }
