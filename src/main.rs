@@ -111,7 +111,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let model = GPT::new(config)?;
-
+    //make this way faster its really slow right now
     let logits = model.forward(batch)?;
     println!("Logits shape: {:?}", logits.shape());
 
