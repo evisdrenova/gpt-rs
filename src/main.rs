@@ -1,5 +1,6 @@
 use candle_core::{Device, Tensor};
 use file_operations::{create_dataloader_v1, load_file};
+use gpt_rs::gpt::{GPT, GPTConfig};
 
 use crate::attention::MultiHeadAttention;
 
@@ -77,6 +78,48 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let values: Vec<Vec<Vec<f32>>> = cv.to_vec3()?; // For 3D tensor
 
     println!("Tensor values: {:?}", values);
+
+    let tokenizer = tiktoken_rs::r50k_base()?;
+
+    let txt1 = "Every effort moves you";
+
+    let txt2 = "Every day holds a";
+
+    let txt1_tokens = tokenizer.encode_with_special_tokens(txt1);
+
+    let txt2_tokens = tokenizer.encode_with_special_tokens(txt2);
+
+    let txt1_tensor = Tensor::from_vec(txt1_tokens.clone(), (txt1_tokens.len(),), &Device::Cpu)?;
+
+    let txt2_tensor = Tensor::from_vec(txt2_tokens.clone(), (txt2_tokens.len(),), &Device::Cpu)?;
+
+    let batch = Tensor::stack(&[&txt1_tensor, &txt2_tensor], 0)?;
+
+    println!("batch:{:?}", batch);
+    let batch_vec: Vec<Vec<u32>> = batch.to_vec2::<u32>()?;
+    println!("batch as vec: {:?}", batch_vec);
+
+    let config = GPTConfig {
+        context_length: context_length,
+        vocab_size: 50257,
+        output_dim: 3,
+        emb_dim: 768,
+        n_heads: 12,
+        n_layers: 12,
+        drop_rate: 0.1,
+        qkv_bias: false,
+    };
+
+    let model = GPT::new(config)?;
+
+    println!("1");
+    let logits = model.forward(batch)?;
+    println!("Logits shape: {:?}", logits.shape());
+
+    // Slice to get only first 5 values in the last dimension
+    let logits_slice = logits.narrow(2, 0, 5)?; // (dim=2, start=0, length=5)
+    let logits_vec: Vec<Vec<Vec<f32>>> = logits_slice.to_vec3::<f32>()?;
+    println!("First 5 logits: {:?}", logits_vec);
 
     Ok(())
 }
