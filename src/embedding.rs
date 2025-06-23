@@ -22,8 +22,6 @@ impl Embedding {
     pub fn forward(&self, token_ids: &Tensor) -> Result<Tensor> {
         let shape = token_ids.dims();
 
-        println!("the tokenIDS{:?}", token_ids);
-
         // handle both 1d and 2d vectors
         let (batch_size, seq_len, is_1d) = match shape.len() {
             1 => (1, shape[0], true),

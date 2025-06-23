@@ -62,17 +62,12 @@ impl GPT {
 
     pub fn forward(self, in_indx: Tensor) -> Result<Tensor, Error> {
         let dims = in_indx.shape().dims();
-        println!("1");
         let (batch_size, seq_len) = parse_batch_and_seq(dims)?;
 
         let tok_embeds = self.tok_emb.forward(&in_indx)?;
-        println!("1.1");
+        // we need to output integeres here so that we can use them in the embedding layer
         let arrange = Tensor::arange(0u32, seq_len as u32, &Device::Cpu)?;
-        println!("1.2");
-        // this si where we have an issue
-        println!("the arrange{:?}", arrange);
         let pos_embeds = self.pos_emb.forward(&arrange)?;
-        println!("2");
         let mut x = tok_embeds.add(&pos_embeds);
         println!("3");
         x = self.drop_emb.forward(&x.unwrap());
