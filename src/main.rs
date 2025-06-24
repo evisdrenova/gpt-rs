@@ -1,8 +1,12 @@
-use candle_core::{DType, Device, Error, Module, Tensor};
+use candle_core::{DType, Device, Error, Tensor};
+use candle_nn::Module;
 use file_operations::{create_dataloader_v1, load_file};
-use gpt_rs::gpt::{GPT, GPTConfig};
 
-use crate::{attention::MultiHeadAttention, gpt::LayerNorm, layers::Linear};
+use crate::{
+    attention::MultiHeadAttention,
+    gpt::{FeedForward, GPTConfig, LayerNorm},
+    layers::Linear,
+};
 
 mod attention;
 mod embedding;
@@ -19,18 +23,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let raw_text = load_file(file_name);
 
-    let max_length: i64 = 4;
+    let max_length = 4;
     let batch_size = 8;
     let stride = 4;
     let shuffle = false;
     let drop_last = true;
     let context_length = 1024;
-    let vocab_size: i64 = 50257;
-    let output_dim: i64 = 3;
+    let vocab_size = 50257;
+    let output_dim = 3;
     let emb_dim = 768;
     let n_heads = 12;
     let n_layers = 12;
-    let drop_rate: f32 = 0.1;
+    let drop_rate = 0.1;
     let qkv_bias = false;
 
     let dataloader = create_dataloader_v1(
@@ -172,5 +176,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\nVerification (should be close to 0 and 1 respectively):");
     println!("Mean values: {:?}", mean_values);
     println!("Var values: {:?}", var_values);
+
+    let ff = FeedForward::new(config.clone())?;
+
+    let x = Tensor::rand(0.0f32, 1.0f32, (2, 3, 768), &Device::Cpu)?;
+
+    let output = ff.forward(&x)?;
+
+    // Print shape
+    println!("Output shape: {:?}", output.shape());
+
     Ok(())
 }

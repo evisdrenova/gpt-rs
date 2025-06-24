@@ -8,7 +8,7 @@ use crate::{
     layers::{Dropout, Linear},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GPTConfig {
     pub context_length: usize,
     pub vocab_size: usize,
@@ -187,7 +187,7 @@ impl FeedForward {
         Ok(FeedForward { layers })
     }
 
-    pub fn forward(&self, x: &Tensor) -> Result<Vec<Tensor>, Error> {
-        Ok(self.layers.forward_all(x)?)
+    pub fn forward(&self, x: &Tensor) -> Result<Tensor, Error> {
+        Ok(self.layers.forward(x)?)
     }
 }
