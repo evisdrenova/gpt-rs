@@ -1,8 +1,8 @@
-use candle_core::{Device, Tensor};
+use candle_core::{DType, Device, Error, Module, Tensor};
 use file_operations::{create_dataloader_v1, load_file};
 use gpt_rs::gpt::{GPT, GPTConfig};
 
-use crate::attention::MultiHeadAttention;
+use crate::{attention::MultiHeadAttention, gpt::LayerNorm, layers::Linear};
 
 mod attention;
 mod embedding;
@@ -110,15 +110,67 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         qkv_bias: false,
     };
 
-    let model = GPT::new(config)?;
-    //make this way faster its really slow right now
-    let logits = model.forward(batch)?;
-    println!("Logits shape: {:?}", logits.shape());
+    // let model = GPT::new(config)?;
+    // //make this way faster its really slow right now
+    // let logits = model.forward(batch)?;
+    // println!("Logits shape: {:?}", logits.shape());
 
-    // Slice to get only first 5 values in the last dimension
-    let logits_slice = logits.narrow(2, 0, 5)?; // (dim=2, start=0, length=5)
-    let logits_vec: Vec<Vec<Vec<f32>>> = logits_slice.to_vec3::<f32>()?;
-    println!("First 5 logits: {:?}", logits_vec);
+    // // Slice to get only first 5 values in the last dimension
+    // let logits_slice = logits.narrow(2, 0, 5)?; // (dim=2, start=0, length=5)
+    // let logits_vec: Vec<Vec<Vec<f32>>> = logits_slice.to_vec3::<f32>()?;
+    // println!("First 5 logits: {:?}", logits_vec);
 
+    ////---_
+
+    let batch_example = Tensor::randn(0.0f32, 1.0f32, (2, 5), &Device::Cpu)?;
+
+    println!("1");
+
+    // Create layer = nn.Sequential(nn.Linear(5, 6), nn.ReLU())
+    // Note: Candle doesn't have a Sequential container, so we'll do it manually
+    let linear_layer = Linear::new(5, 6, false, &Device::Cpu)?;
+
+    println!("2");
+
+    // Forward pass: Linear -> ReLU
+    let linear_out = linear_layer.forward(&batch_example)?;
+    println!("2.5");
+    let out = linear_out.relu()?;
+
+    println!("Sequential output:");
+    println!("{:?}", out.to_vec2::<f32>()?);
+
+    println!("3");
+
+    // Create LayerNorm with emb_dim=5
+    let ln = LayerNorm::new_default(5, &Device::Cpu)?;
+
+    // Apply LayerNorm: out_ln = ln(batch_example)
+    let out_ln = ln.forward(&batch_example)?;
+
+    println!("3");
+
+    // Calculate mean along last dimension with keepdim=True
+    let mean = out_ln.mean_keepdim(1)?; // dim=1 is the last dimension for shape [2, 5]
+
+    // Calculate variance along last dimension with keepdim=True, unbiased=False
+    let var = out_ln.var_keepdim(1)?;
+
+    println!("\nLayerNorm output:");
+    println!("{:?}", out_ln.to_vec2::<f32>()?);
+
+    println!("\nMean:");
+    println!("{:?}", mean.to_vec2::<f32>()?);
+
+    println!("\nVariance:");
+    println!("{:?}", var.to_vec2::<f32>()?);
+
+    // Verify that mean is close to 0 and variance is close to 1 after LayerNorm
+    let mean_values = mean.to_vec2::<f32>()?;
+    let var_values = var.to_vec2::<f32>()?;
+
+    println!("\nVerification (should be close to 0 and 1 respectively):");
+    println!("Mean values: {:?}", mean_values);
+    println!("Var values: {:?}", var_values);
     Ok(())
 }

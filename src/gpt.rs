@@ -46,7 +46,7 @@ impl GPT {
             trf_blocks = trf_blocks.add(block);
         }
 
-        let final_norm = LayerNorm::new(cfg.emb_dim, 0.00001)?;
+        let final_norm = LayerNorm::new(cfg.emb_dim, 0.00001, &device)?;
 
         let out_head = Linear::new(cfg.emb_dim, cfg.vocab_size, false, &device)?;
 
