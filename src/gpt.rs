@@ -1,6 +1,6 @@
 use candle_core::{DType, Device, Error, Tensor};
 use candle_nn::{Module, Sequential, seq};
-use rand::seq;
+use std::f32::consts;
 
 use crate::{
     attention::parse_batch_and_seq,
@@ -127,5 +127,65 @@ impl Module for LayerNorm {
         let result = scaled.broadcast_add(&self.shift)?;
 
         Ok(result)
+    }
+}
+
+pub struct GeLU {}
+
+impl GeLU {
+    pub fn new() -> Result<Self, Error> {
+        Ok(GeLU {})
+    }
+
+    pub fn forward(&self, x: &Tensor) -> Result<Tensor, Error> {
+        let sqrt_2_over_pi_val = (2.0f32 / consts::PI).sqrt();
+        let sqrt_2_over_pi = Tensor::new(sqrt_2_over_pi_val, x.device())?;
+
+        let x_cubed = x.powf(3.0)?;
+
+        let coefficient = Tensor::new(0.044715f32, x.device())?;
+        let cubic_term = x_cubed.broadcast_mul(&coefficient)?;
+
+        let inner = x.broadcast_add(&cubic_term)?;
+
+        let tanh_input = inner.broadcast_mul(&sqrt_2_over_pi)?;
+
+        let tanh_result = tanh_input.tanh()?;
+
+        let ones = Tensor::ones(tanh_result.shape(), x.dtype(), x.device())?;
+        let one_plus_tanh = tanh_result.broadcast_add(&ones)?;
+
+        let half = Tensor::new(0.5f32, x.device())?;
+        let half_x = x.broadcast_mul(&half)?;
+
+        let gelu = half_x.broadcast_mul(&one_plus_tanh)?;
+
+        Ok(gelu)
+    }
+}
+
+pub struct FeedForward {
+    layers: Sequential,
+}
+
+impl FeedForward {
+    pub fn new(cfg: GPTConfig) -> Result<Self, Error> {
+        let mut layers: Sequential = seq();
+
+        let l_layer1 = Linear::new(cfg.emb_dim, 4 * cfg.emb_dim, false, &Device::Cpu)?;
+
+        let gelu = GeLU::new()?;
+
+        let l_layer2 = Linear::new(4 * cfg.emb_dim, cfg.emb_dim, false, &Device::Cpu)?;
+
+        layers = layers.add(l_layer1);
+        layers = layers.add(gelu);
+        layers = layers.add(l_layer2);
+
+        Ok(FeedForward { layers })
+    }
+
+    pub fn forward(&self, x: &Tensor) -> Result<Vec<Tensor>, Error> {
+        Ok(self.layers.forward_all(x)?)
     }
 }
