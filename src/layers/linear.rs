@@ -1,4 +1,5 @@
 use candle_core::{Device, Error, Tensor};
+use candle_nn::Module;
 
 use crate::rng;
 
@@ -42,8 +43,10 @@ impl Linear {
             in_features,
         })
     }
+}
 
-    pub fn forward(&self, input: &Tensor) -> Result<Tensor, Error> {
+impl Module for Linear {
+    fn forward(&self, input: &Tensor) -> Result<Tensor, Error> {
         let input_shape = input.dims();
 
         if input_shape.is_empty() {

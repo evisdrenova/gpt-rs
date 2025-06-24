@@ -136,8 +136,10 @@ impl GeLU {
     pub fn new() -> Result<Self, Error> {
         Ok(GeLU {})
     }
+}
 
-    pub fn forward(&self, x: &Tensor) -> Result<Tensor, Error> {
+impl Module for GeLU {
+    fn forward(&self, x: &Tensor) -> Result<Tensor, Error> {
         let sqrt_2_over_pi_val = (2.0f32 / consts::PI).sqrt();
         let sqrt_2_over_pi = Tensor::new(sqrt_2_over_pi_val, x.device())?;
 

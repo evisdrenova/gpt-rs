@@ -1,6 +1,6 @@
-use candle_core::{Device, Error, Tensor};
-
 use crate::layers::{Dropout, Linear};
+use candle_core::{Device, Error, Tensor};
+use candle_nn::Module;
 /*
 
 TODOs
