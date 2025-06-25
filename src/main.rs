@@ -50,15 +50,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     model.eval(); // Disables dropout (like your Python code)
 
     // Now generate text without dropout
-    let out = generate_text_loop(&model, encoded_tensor, 6, config.context_length)?;
+    let out = generate_text_loop(&model, encoded_tensor.clone(), 6, config.context_length)?;
 
-    println!("Output: {:?}", out);
+    println!("=== Generation Results ===");
+    println!("Output tensor: {:?}", out);
     println!("Output length: {}", out.dim(1)?);
     println!("Output shape: {:?}", out.shape());
 
+    // Show original vs generated tokens
     let output_tokens: Vec<u32> = out.squeeze(0)?.to_vec1()?;
+    let original_tokens: Vec<u32> = encoded_tensor.squeeze(0)?.to_vec1()?;
+
+    println!("Original tokens: {:?}", original_tokens);
+    println!(
+        "Generated tokens: {:?}",
+        &output_tokens[original_tokens.len()..]
+    );
+    println!("All tokens: {:?}", output_tokens);
+
+    // Decode text
     let decoded_text = tokenizer.decode(output_tokens)?;
-    println!("{}", decoded_text);
+    println!("Generated text: {}", decoded_text);
 
     Ok(())
 }

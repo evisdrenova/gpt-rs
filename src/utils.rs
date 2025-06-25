@@ -45,6 +45,5 @@ pub fn generate_text_loop(
 
         idx = Tensor::cat(&[idx, idx_next], 1)?;
     }
-    println!("8");
     Ok(idx)
 }
