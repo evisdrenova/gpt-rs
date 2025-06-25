@@ -213,32 +213,25 @@ impl MultiHeadAttention {
     pub fn parameters(&self) -> Vec<&Tensor> {
         let mut params = Vec::new();
 
-        // Query projection parameters
         params.push(&self.w_query.weight);
         if let Some(bias) = &self.w_query.bias {
             params.push(bias);
         }
 
-        // Key projection parameters
         params.push(&self.w_key.weight);
         if let Some(bias) = &self.w_key.bias {
             params.push(bias);
         }
 
-        // Value projection parameters
         params.push(&self.w_value.weight);
         if let Some(bias) = &self.w_value.bias {
             params.push(bias);
         }
 
-        // Output projection parameters
         params.push(&self.out_proj.weight);
         if let Some(bias) = &self.out_proj.bias {
             params.push(bias);
         }
-
-        // Note: Dropout has no parameters
-        // Note: Mask is not a trainable parameter
 
         params
     }

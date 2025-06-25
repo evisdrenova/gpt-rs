@@ -1,4 +1,4 @@
-use candle_core::{DType, Device, Error, Tensor};
+use candle_core::{Device, Tensor};
 use candle_nn::Module;
 use file_operations::{create_dataloader_v1, load_file};
 
@@ -106,7 +106,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = GPTConfig {
         context_length: 1024,
         vocab_size: 50257,
-        output_dim: 3,
         emb_dim: 768,
         n_heads: 12,
         n_layers: 12,

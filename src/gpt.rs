@@ -1,5 +1,5 @@
 use candle_core::{DType, Device, Error, Tensor};
-use candle_nn::{Module, Sequential, seq};
+use candle_nn::Module;
 use std::f32::consts;
 
 use crate::{
@@ -12,7 +12,6 @@ use crate::{
 pub struct GPTConfig {
     pub context_length: usize,
     pub vocab_size: usize,
-    pub output_dim: usize,
     pub emb_dim: usize,
     pub n_heads: usize,
     pub n_layers: usize,
@@ -33,7 +32,6 @@ impl GPT {
     pub fn new(cfg: GPTConfig) -> Result<Self, Error> {
         let device = Device::Cpu;
 
-        // create embedding layers
         let tok_emb = Embedding::new(cfg.vocab_size, cfg.emb_dim, device.clone())?;
         let pos_emb = Embedding::new(cfg.context_length, cfg.emb_dim, device.clone())?;
 
@@ -61,10 +59,10 @@ impl GPT {
 
     pub fn forward(self, in_indx: Tensor) -> Result<Tensor, Error> {
         let dims = in_indx.shape().dims();
-        let (batch_size, seq_len) = parse_batch_and_seq(dims)?;
+        let (_, seq_len) = parse_batch_and_seq(dims)?;
 
         let tok_embeds = self.tok_emb.forward(&in_indx)?;
-        // we need to output integeres here so that we can use them in the embedding layer
+        // we need to output integers here so that we can use them in the embedding layer
         let arrange = Tensor::arange(0u32, seq_len as u32, &Device::Cpu)?;
 
         let pos_embeds = self.pos_emb.forward(&arrange)?;
@@ -209,15 +207,11 @@ impl FeedForward {
     pub fn parameters(&self) -> Vec<&Tensor> {
         let mut params = Vec::new();
 
-        // Layer 1
         params.push(&self.layer1.weight);
         if let Some(bias) = &self.layer1.bias {
             params.push(bias);
         }
 
-        // GeLU has no parameters
-
-        // Layer 2
         params.push(&self.layer2.weight);
         if let Some(bias) = &self.layer2.bias {
             params.push(bias);
@@ -273,15 +267,6 @@ impl TransformerBlock {
         params.push(&self.norm2.scale);
         params.push(&self.norm2.shift);
         params
-    }
-
-    pub fn parameter_count(&self) -> usize {
-        let attn_count = self.attention.parameter_count();
-        let ff_count: usize = self.ff.parameters().iter().map(|p| p.elem_count()).sum();
-        let ln1_count = self.norm1.scale.elem_count() + self.norm1.shift.elem_count();
-        let ln2_count = self.norm2.scale.elem_count() + self.norm2.shift.elem_count();
-
-        attn_count + ff_count + ln1_count + ln2_count
     }
 }
 
