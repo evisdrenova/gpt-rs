@@ -2,7 +2,6 @@ use candle_core::{Device, Error, Tensor};
 use candle_nn::Module;
 
 use crate::{
-    activations::Activations,
     embedding::Embedding,
     layers::{Dropout, Linear},
     neural_net::TransformerBlock,

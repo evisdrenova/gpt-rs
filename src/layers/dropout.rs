@@ -3,14 +3,36 @@ use rand::Rng;
 
 pub struct Dropout {
     p: f32,
+    training: bool,
 }
 
 impl Dropout {
     pub fn new(p: f32) -> Self {
-        Dropout { p }
+        Dropout { p, training: false }
+    }
+
+    pub fn set_training(&mut self, training: bool) {
+        self.training = training;
+    }
+
+    pub fn train(&mut self) {
+        self.training = true;
+    }
+
+    pub fn eval(&mut self) {
+        self.training = false;
     }
 
     pub fn forward(&self, x: &Tensor) -> Result<Tensor, Error> {
+        if !self.training || self.p == 0.0 {
+            return Ok(x.clone());
+        }
+
+        // If dropout probability is 1.0, return zeros
+        if self.p >= 1.0 {
+            return Ok(Tensor::zeros_like(x)?);
+        }
+
         // get dims and total element count
         let dims = x.shape().dims();
         let n: usize = dims.iter().product();

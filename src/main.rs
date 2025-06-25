@@ -1,4 +1,4 @@
-use candle_core::{Device, Tensor};
+use candle_core::{Device, Error, Tensor};
 use candle_nn::Module;
 use file_operations::{create_dataloader_v1, load_file};
 
@@ -7,6 +7,7 @@ use crate::{
     gpt::{GPT, GPTConfig},
     layers::Linear,
     neural_net::{FeedForward, TransformerBlock},
+    utils::generate_text_simple,
 };
 
 mod activations;
@@ -177,19 +178,49 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Input shape:  {:?}", x.shape());
     println!("Output shape: {:?}", output.shape());
 
-    let model = GPT::new(config)?;
+    // let model = GPT::new(config)?;
 
-    let total_params = model.parameter_count();
-    println!("Total number of parameters: {:?}", total_params);
+    // let total_params = model.parameter_count();
+    // println!("Total number of parameters: {:?}", total_params);
 
-    //make this way faster its really slow right now
-    let logits = model.forward(&batch)?;
-    println!("Logits shape: {:?}", logits.shape());
+    // //make this way faster its really slow right now
+    // let logits = model.forward(&batch)?;
+    // println!("Logits shape: {:?}", logits.shape());
 
-    // Slice to get only first 5 values in the last dimension
-    let logits_slice = logits.narrow(2, 0, 5)?; // (dim=2, start=0, length=5)
-    let logits_vec: Vec<Vec<Vec<f32>>> = logits_slice.to_vec3::<f32>()?;
-    println!("First 5 logits: {:?}", logits_vec);
+    // // Slice to get only first 5 values in the last dimension
+    // let logits_slice = logits.narrow(2, 0, 5)?; // (dim=2, start=0, length=5)
+    // let logits_vec: Vec<Vec<Vec<f32>>> = logits_slice.to_vec3::<f32>()?;
+    // println!("First 5 logits: {:?}", logits_vec);
+
+    let start_text = "Hello, I am";
+
+    let encoded = tokenizer.encode_with_special_tokens(start_text);
+
+    print!("encoded: {:?}", encoded);
+
+    let encoded_tensor = Tensor::from_vec(encoded.clone(), (txt1_tokens.len(),), &Device::Cpu)?;
+
+    print!("encoded: {:?}", encoded_tensor.shape());
+
+    let model = GPT::new(config.clone())?;
+
+    let out = generate_text_simple(&model, encoded_tensor, 6, config.clone().context_length)?;
+
+    println!("Generated output tensor: {:?}", out);
+    println!("Output shape: {:?}", out.shape());
+
+    // Convert back to text
+    let output_tokens = tensor_to_vec(&out)?;
+    let decoded_text = tokenizer.decode(output_tokens)?;
+    println!("Generated text: {}", decoded_text);
 
     Ok(())
+}
+
+fn tensor_to_vec(tensor: &Tensor) -> Result<Vec<u32>, Error> {
+    // Assuming the tensor is 2D: (batch_size, sequence_length)
+    // We'll take the first batch
+    let flat_tensor = tensor.flatten_all()?;
+    let data: Vec<u32> = flat_tensor.to_vec1()?;
+    Ok(data)
 }
