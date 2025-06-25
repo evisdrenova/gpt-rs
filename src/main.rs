@@ -4,7 +4,7 @@ use file_operations::{create_dataloader_v1, load_file};
 
 use crate::{
     attention::MultiHeadAttention,
-    gpt::{FeedForward, GPTConfig, LayerNorm},
+    gpt::{FeedForward, GPT, GPTConfig, LayerNorm, TransformerBlock},
     layers::Linear,
 };
 
@@ -104,7 +104,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("batch as vec: {:?}", batch_vec);
 
     let config = GPTConfig {
-        context_length: context_length,
+        context_length: 1024,
         vocab_size: 50257,
         output_dim: 3,
         emb_dim: 768,
@@ -113,18 +113,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         drop_rate: 0.1,
         qkv_bias: false,
     };
-
-    // let model = GPT::new(config)?;
-    // //make this way faster its really slow right now
-    // let logits = model.forward(batch)?;
-    // println!("Logits shape: {:?}", logits.shape());
-
-    // // Slice to get only first 5 values in the last dimension
-    // let logits_slice = logits.narrow(2, 0, 5)?; // (dim=2, start=0, length=5)
-    // let logits_vec: Vec<Vec<Vec<f32>>> = logits_slice.to_vec3::<f32>()?;
-    // println!("First 5 logits: {:?}", logits_vec);
-
-    ////---_
 
     let batch_example = Tensor::randn(0.0f32, 1.0f32, (2, 5), &Device::Cpu)?;
 
@@ -185,6 +173,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Print shape
     println!("Output shape: {:?}", output.shape());
+
+    let x = Tensor::rand(0.0f32, 1.0f32, (2, 4, 768), &Device::Cpu)?;
+
+    let block = TransformerBlock::new(&config.clone())?;
+
+    let output = block.forward(&x)?;
+    println!("Input shape:  {:?}", x.shape());
+    println!("Output shape: {:?}", output.shape());
+
+    let model = GPT::new(config)?;
+
+    let total_params = model.parameter_count();
+    println!("Total number of parameters: {:?}", total_params);
+
+    //make this way faster its really slow right now
+    let logits = model.forward(batch)?;
+    println!("Logits shape: {:?}", logits.shape());
+
+    // Slice to get only first 5 values in the last dimension
+    let logits_slice = logits.narrow(2, 0, 5)?; // (dim=2, start=0, length=5)
+    let logits_vec: Vec<Vec<Vec<f32>>> = logits_slice.to_vec3::<f32>()?;
+    println!("First 5 logits: {:?}", logits_vec);
 
     Ok(())
 }

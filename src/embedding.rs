@@ -49,4 +49,12 @@ impl Embedding {
             Ok(reshaped)
         }
     }
+
+    pub fn parameters(&self) -> Vec<&Tensor> {
+        vec![&self.weights]
+    }
+
+    pub fn parameter_count(&self) -> usize {
+        self.weights.elem_count()
+    }
 }

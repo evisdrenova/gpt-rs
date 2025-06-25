@@ -24,7 +24,7 @@ pub struct GPT {
     pub tok_emb: Embedding,
     pub pos_emb: Embedding,
     pub drop_emb: Dropout,
-    pub trf_blocks: Sequential,
+    pub trf_blocks: Vec<TransformerBlock>,
     pub final_norm: LayerNorm,
     pub out_head: Linear,
 }
@@ -38,12 +38,11 @@ impl GPT {
         let pos_emb = Embedding::new(cfg.context_length, cfg.emb_dim, device.clone())?;
 
         let drop_emb = Dropout::new(cfg.drop_rate);
-        // creates a list of modules and then connects the inputs to ouputs of the models in a feed forward type of way
 
-        let mut trf_blocks: Sequential = seq();
+        let mut trf_blocks: Vec<TransformerBlock> = Vec::new();
         for _ in 0..cfg.n_layers {
-            let block = TransformerBlock::new(&cfg)?;
-            trf_blocks = trf_blocks.add(block);
+            let block: TransformerBlock = TransformerBlock::new(&cfg)?;
+            trf_blocks.push(block);
         }
 
         let final_norm = LayerNorm::new(cfg.emb_dim, 0.00001, &device)?;
@@ -70,11 +69,40 @@ impl GPT {
 
         let pos_embeds = self.pos_emb.forward(&arrange)?;
         let embeddings = tok_embeds.broadcast_add(&pos_embeds)?;
-        let dropped_embeddings = self.drop_emb.forward(&embeddings)?;
-        let transformer_output = self.trf_blocks.forward(&dropped_embeddings)?;
-        let normalized_output = self.final_norm.forward(&transformer_output)?;
+
+        let mut x = self.drop_emb.forward(&embeddings)?;
+
+        for block in &self.trf_blocks {
+            x = block.forward(&x)?;
+        }
+        let normalized_output = self.final_norm.forward(&x)?;
         let logits = self.out_head.forward(&normalized_output)?;
         Ok(logits)
+    }
+
+    pub fn parameters(&self) -> Vec<&Tensor> {
+        let mut params = Vec::new();
+
+        params.extend(self.tok_emb.parameters());
+        params.extend(self.pos_emb.parameters());
+
+        for block in &self.trf_blocks {
+            params.extend(block.parameters());
+        }
+
+        params.push(&self.final_norm.scale);
+        params.push(&self.final_norm.shift);
+
+        params.push(&self.out_head.weight);
+        if let Some(bias) = &self.out_head.bias {
+            params.push(bias);
+        }
+
+        params
+    }
+
+    pub fn parameter_count(&self) -> usize {
+        self.parameters().iter().map(|p| p.elem_count()).sum()
     }
 }
 
@@ -153,28 +181,49 @@ impl Module for GeLU {
 }
 
 pub struct FeedForward {
-    layers: Sequential,
+    layer1: Linear,
+    gelu: GeLU,
+    layer2: Linear,
 }
 
 impl FeedForward {
     pub fn new(cfg: GPTConfig) -> Result<Self, Error> {
-        let mut layers: Sequential = seq();
-
-        let l_layer1 = Linear::new(cfg.emb_dim, 4 * cfg.emb_dim, false, &Device::Cpu)?;
-
+        let layer1 = Linear::new(cfg.emb_dim, 4 * cfg.emb_dim, true, &Device::Cpu)?;
         let gelu = GeLU::new()?;
+        let layer2 = Linear::new(4 * cfg.emb_dim, cfg.emb_dim, true, &Device::Cpu)?;
 
-        let l_layer2 = Linear::new(4 * cfg.emb_dim, cfg.emb_dim, false, &Device::Cpu)?;
-
-        layers = layers.add(l_layer1);
-        layers = layers.add(gelu);
-        layers = layers.add(l_layer2);
-
-        Ok(FeedForward { layers })
+        Ok(FeedForward {
+            layer1,
+            gelu,
+            layer2,
+        })
     }
 
     pub fn forward(&self, x: &Tensor) -> Result<Tensor, Error> {
-        Ok(self.layers.forward(x)?)
+        let x = self.layer1.forward(x)?;
+        let x = self.gelu.forward(&x)?;
+        let x = self.layer2.forward(&x)?;
+        Ok(x)
+    }
+
+    pub fn parameters(&self) -> Vec<&Tensor> {
+        let mut params = Vec::new();
+
+        // Layer 1
+        params.push(&self.layer1.weight);
+        if let Some(bias) = &self.layer1.bias {
+            params.push(bias);
+        }
+
+        // GeLU has no parameters
+
+        // Layer 2
+        params.push(&self.layer2.weight);
+        if let Some(bias) = &self.layer2.bias {
+            params.push(bias);
+        }
+
+        params
     }
 }
 
@@ -210,6 +259,29 @@ impl TransformerBlock {
             norm2,
             drop_shortcut,
         })
+    }
+
+    pub fn parameters(&self) -> Vec<&Tensor> {
+        let mut params = Vec::new();
+
+        params.extend(self.attention.parameters());
+
+        params.extend(self.ff.parameters());
+
+        params.push(&self.norm1.scale);
+        params.push(&self.norm1.shift);
+        params.push(&self.norm2.scale);
+        params.push(&self.norm2.shift);
+        params
+    }
+
+    pub fn parameter_count(&self) -> usize {
+        let attn_count = self.attention.parameter_count();
+        let ff_count: usize = self.ff.parameters().iter().map(|p| p.elem_count()).sum();
+        let ln1_count = self.norm1.scale.elem_count() + self.norm1.shift.elem_count();
+        let ln2_count = self.norm2.scale.elem_count() + self.norm2.shift.elem_count();
+
+        attn_count + ff_count + ln1_count + ln2_count
     }
 }
 
