@@ -1,4 +1,7 @@
-use crate::layers::{Dropout, Linear};
+use crate::{
+    activations::Activations,
+    layers::{Dropout, Linear},
+};
 use candle_core::{Device, Error, Tensor};
 use candle_nn::Module;
 /*
@@ -113,7 +116,7 @@ impl MultiHeadAttention {
         let scaled_scores = (masked_scores * scale)?;
 
         // Apply softmax
-        let attn_weights = Self::softmax(&scaled_scores, Some(scaled_scores.rank() - 1))?;
+        let attn_weights = Activations::softmax(&scaled_scores, Some(scaled_scores.rank() - 1))?;
 
         // Apply dropout
         let attn_weights = self.dropout.forward(&attn_weights)?;
@@ -183,31 +186,6 @@ impl MultiHeadAttention {
         let neg_inf = Tensor::zeros_like(attn_scores)?.affine(0.0, f64::NEG_INFINITY)?;
 
         bool_mask.where_cond(&neg_inf, attn_scores)
-    }
-
-    pub fn softmax(input: &Tensor, dim: Option<usize>) -> Result<Tensor, Error> {
-        // Softmax formula: softmax(x_i) = exp(x_i) / sum(exp(x_j) for all j)
-
-        // Apply exponential function element-wise
-        let exp_values = input.exp()?;
-
-        let softmax_result = match dim {
-            Some(dimension) => {
-                // Row-wise (or dimension-wise) softmax
-                // Sum along the specified dimension while keeping dimensions
-                let exp_sum = exp_values.sum_keepdim(dimension)?;
-                // Normalize: divide each element by the sum along that dimension
-                exp_values.broadcast_div(&exp_sum)?
-            }
-            None => {
-                // Sum all exponential values
-                let exp_sum = exp_values.sum_all()?;
-                // Normalize: divide each exp value by the total sum
-                exp_values.broadcast_div(&exp_sum)?
-            }
-        };
-
-        Ok(softmax_result)
     }
 
     pub fn parameters(&self) -> Vec<&Tensor> {

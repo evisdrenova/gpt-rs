@@ -1,11 +1,12 @@
-use candle_core::{DType, Device, Error, Tensor};
+use candle_core::{Device, Error, Tensor};
 use candle_nn::Module;
-use std::f32::consts;
 
 use crate::{
+    activations::{Activations, GeLU},
     attention::{MultiHeadAttention, parse_batch_and_seq},
     embedding::Embedding,
     layers::{Dropout, Linear},
+    normalization::LayerNorm,
 };
 
 #[derive(Debug, Clone)]
@@ -57,7 +58,7 @@ impl GPT {
         })
     }
 
-    pub fn forward(self, in_indx: Tensor) -> Result<Tensor, Error> {
+    pub fn forward(&self, in_indx: &Tensor) -> Result<Tensor, Error> {
         let dims = in_indx.shape().dims();
         let (_, seq_len) = parse_batch_and_seq(dims)?;
 
@@ -101,80 +102,6 @@ impl GPT {
 
     pub fn parameter_count(&self) -> usize {
         self.parameters().iter().map(|p| p.elem_count()).sum()
-    }
-}
-
-pub struct LayerNorm {
-    eps: f32,
-    scale: Tensor,
-    shift: Tensor,
-}
-
-impl LayerNorm {
-    pub fn new(emb_dim: usize, eps: f32, device: &Device) -> Result<Self, Error> {
-        let scale = Tensor::ones(emb_dim, DType::F32, device)?;
-        let shift = Tensor::zeros(emb_dim, DType::F32, device)?;
-
-        Ok(Self { eps, scale, shift })
-    }
-
-    pub fn new_default(emb_dim: usize, device: &Device) -> Result<Self, Error> {
-        Self::new(emb_dim, 1e-5, device)
-    }
-}
-
-impl Module for LayerNorm {
-    fn forward(&self, x: &Tensor) -> Result<Tensor, Error> {
-        let last_dim = x.dims().len() - 1;
-
-        let mean = x.mean_keepdim(last_dim)?;
-        let var = x.var_keepdim(last_dim)?;
-
-        let x_centered = x.broadcast_sub(&mean)?;
-        let var_eps = var.broadcast_add(&Tensor::new(self.eps, x.device())?)?;
-        let std = var_eps.sqrt()?;
-        let norm_x = x_centered.broadcast_div(&std)?;
-
-        let scaled = norm_x.broadcast_mul(&self.scale)?;
-        let result = scaled.broadcast_add(&self.shift)?;
-
-        Ok(result)
-    }
-}
-
-pub struct GeLU {}
-
-impl GeLU {
-    pub fn new() -> Result<Self, Error> {
-        Ok(GeLU {})
-    }
-}
-
-impl Module for GeLU {
-    fn forward(&self, x: &Tensor) -> Result<Tensor, Error> {
-        let sqrt_2_over_pi_val = (2.0f32 / consts::PI).sqrt();
-        let sqrt_2_over_pi = Tensor::new(sqrt_2_over_pi_val, x.device())?;
-
-        let x_cubed = x.powf(3.0)?;
-
-        let coefficient = Tensor::new(0.044715f32, x.device())?;
-        let cubic_term = x_cubed.broadcast_mul(&coefficient)?;
-
-        let inner = x.broadcast_add(&cubic_term)?;
-
-        let tanh_input = inner.broadcast_mul(&sqrt_2_over_pi)?;
-
-        let tanh_result = tanh_input.tanh()?;
-
-        let ones = Tensor::ones(tanh_result.shape(), x.dtype(), x.device())?;
-        let one_plus_tanh = tanh_result.broadcast_add(&ones)?;
-
-        let half = Tensor::new(0.5f32, x.device())?;
-        let half_x = x.broadcast_mul(&half)?;
-
-        let gelu = half_x.broadcast_mul(&one_plus_tanh)?;
-
-        Ok(gelu)
     }
 }
 
@@ -286,4 +213,39 @@ impl Module for TransformerBlock {
 
         Ok(x)
     }
+}
+
+pub fn generate_text_simple(
+    model: &GPT,
+    mut idx: Tensor,
+    max_new_tokens: usize,
+    context_size: usize,
+) -> Result<Tensor, Error> {
+    // Generate tokens one by one
+    for _ in 0..max_new_tokens {
+        // Crop current context if it exceeds the supported context size
+        // if LLM supports only 5 tokens, and the context size is 10,
+        // then only the last 5 tokens are used as context
+        let seq_len = idx.dim(1)?;
+        let idx_cond = if seq_len > context_size {
+            let start_idx = seq_len - context_size;
+            idx.narrow(1, start_idx, context_size)?
+        } else {
+            idx.clone()
+        };
+
+        let logits = model.forward(&idx_cond)?;
+
+        let last_token_logits = logits.narrow(1, logits.dim(1)? - 1, 1)?;
+        let last_token_logits = last_token_logits.squeeze(1)?;
+
+        let probas = Activations::softmax(&last_token_logits, Some(1))?;
+
+        let idx_next = probas.argmax_keepdim(1)?;
+        let idx_next = idx_next.unsqueeze(1)?;
+
+        idx = Tensor::cat(&[idx, idx_next], 1)?;
+    }
+
+    Ok(idx)
 }

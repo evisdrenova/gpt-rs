@@ -4,15 +4,17 @@ use file_operations::{create_dataloader_v1, load_file};
 
 use crate::{
     attention::MultiHeadAttention,
-    gpt::{FeedForward, GPT, GPTConfig, LayerNorm, TransformerBlock},
+    gpt::{FeedForward, GPT, GPTConfig, TransformerBlock},
     layers::Linear,
 };
 
+mod activations;
 mod attention;
 mod embedding;
 mod file_operations;
 mod layers;
 mod module_list;
+mod normalization;
 mod rng;
 mod simple_tokenizer;
 
@@ -134,7 +136,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("3");
 
     // Create LayerNorm with emb_dim=5
-    let ln = LayerNorm::new_default(5, &Device::Cpu)?;
+    let ln = normalization::LayerNorm::new_default(5, &Device::Cpu)?;
 
     // Apply LayerNorm: out_ln = ln(batch_example)
     let out_ln = ln.forward(&batch_example)?;
@@ -187,7 +189,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Total number of parameters: {:?}", total_params);
 
     //make this way faster its really slow right now
-    let logits = model.forward(batch)?;
+    let logits = model.forward(&batch)?;
     println!("Logits shape: {:?}", logits.shape());
 
     // Slice to get only first 5 values in the last dimension

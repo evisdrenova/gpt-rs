@@ -1,7 +1,9 @@
+pub mod activations;
 pub mod attention;
 pub mod embedding;
 pub mod file_operations;
 pub mod gpt;
 pub mod layers;
 pub mod module_list;
+pub mod normalization;
 pub mod rng;
