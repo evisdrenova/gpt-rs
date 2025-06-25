@@ -79,6 +79,23 @@ impl GPT {
         Ok(logits)
     }
 
+    pub fn train(&mut self) {
+        self.drop_emb.train();
+
+        for block in &mut self.trf_blocks {
+            block.train();
+        }
+    }
+
+    // Set model to evaluation mode (disables dropout)
+    pub fn eval(&mut self) {
+        self.drop_emb.eval();
+
+        for block in &mut self.trf_blocks {
+            block.eval();
+        }
+    }
+
     pub fn parameters(&self) -> Vec<&Tensor> {
         let mut params = Vec::new();
 

@@ -219,4 +219,16 @@ impl MultiHeadAttention {
     pub fn parameter_count(&self) -> usize {
         self.parameters().iter().map(|p| p.elem_count()).sum()
     }
+
+    pub fn train(&mut self) {
+        self.dropout.train();
+    }
+
+    pub fn eval(&mut self) {
+        self.dropout.eval();
+    }
+
+    pub fn set_training(&mut self, training: bool) {
+        self.dropout.set_training(training);
+    }
 }

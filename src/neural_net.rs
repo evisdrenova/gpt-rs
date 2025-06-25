@@ -98,6 +98,21 @@ impl TransformerBlock {
         params.push(&self.norm2.shift);
         params
     }
+
+    pub fn train(&mut self) {
+        self.drop_shortcut.train();
+        self.attention.train(); // Now we can control attention dropout too
+    }
+
+    pub fn eval(&mut self) {
+        self.drop_shortcut.eval();
+        self.attention.eval(); // Disable attention dropout during eval
+    }
+
+    pub fn set_training(&mut self, training: bool) {
+        self.drop_shortcut.set_training(training);
+        self.attention.set_training(training);
+    }
 }
 
 impl Module for TransformerBlock {
