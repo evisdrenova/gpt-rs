@@ -1,6 +1,7 @@
 use crate::{
     activations::Activations,
     layers::{Dropout, Linear},
+    utils::parse_batch_and_seq,
 };
 use candle_core::{Device, Error, Tensor};
 use candle_nn::Module;
@@ -216,17 +217,5 @@ impl MultiHeadAttention {
 
     pub fn parameter_count(&self) -> usize {
         self.parameters().iter().map(|p| p.elem_count()).sum()
-    }
-}
-
-pub fn parse_batch_and_seq(dims: &[usize]) -> Result<(usize, usize), Error> {
-    match dims.len() {
-        1 => Ok((1, dims[0])),
-        2 => Ok((dims[0], dims[1])),
-        3 => Ok((dims[0], dims[1])),
-        _ => Err(Error::Msg(format!(
-            "Expected 1D, 2D or 3D input, got {}D",
-            dims.len()
-        ))),
     }
 }

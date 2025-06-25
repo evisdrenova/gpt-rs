@@ -5,5 +5,7 @@ pub mod file_operations;
 pub mod gpt;
 pub mod layers;
 pub mod module_list;
+pub mod neural_net;
 pub mod normalization;
 pub mod rng;
+pub mod utils;
