@@ -3,7 +3,7 @@ use candle_nn::{Module, Sequential, seq};
 use std::f32::consts;
 
 use crate::{
-    attention::parse_batch_and_seq,
+    attention::{MultiHeadAttention, parse_batch_and_seq},
     embedding::Embedding,
     layers::{Dropout, Linear},
 };
@@ -42,7 +42,7 @@ impl GPT {
 
         let mut trf_blocks: Sequential = seq();
         for _ in 0..cfg.n_layers {
-            let block = DummyTransformerBlock::new(&cfg)?;
+            let block = TransformerBlock::new(&cfg)?;
             trf_blocks = trf_blocks.add(block);
         }
 
@@ -75,20 +75,6 @@ impl GPT {
         let normalized_output = self.final_norm.forward(&transformer_output)?;
         let logits = self.out_head.forward(&normalized_output)?;
         Ok(logits)
-    }
-}
-
-pub struct DummyTransformerBlock {}
-
-impl DummyTransformerBlock {
-    pub fn new(_cfg: &GPTConfig) -> Result<Self, Error> {
-        Ok(Self {})
-    }
-}
-
-impl Module for DummyTransformerBlock {
-    fn forward(&self, x: &Tensor) -> Result<Tensor, Error> {
-        Ok(x.clone())
     }
 }
 
@@ -189,5 +175,58 @@ impl FeedForward {
 
     pub fn forward(&self, x: &Tensor) -> Result<Tensor, Error> {
         Ok(self.layers.forward(x)?)
+    }
+}
+
+pub struct TransformerBlock {
+    attention: MultiHeadAttention,
+    ff: FeedForward,
+    norm1: LayerNorm,
+    norm2: LayerNorm,
+    drop_shortcut: Dropout,
+}
+
+impl TransformerBlock {
+    pub fn new(cfg: &GPTConfig) -> Result<Self, Error> {
+        let device = Device::Cpu;
+        let attention = MultiHeadAttention::new(
+            cfg.emb_dim,
+            cfg.emb_dim,
+            cfg.context_length,
+            cfg.drop_rate,
+            cfg.n_heads,
+            Some(cfg.qkv_bias),
+            device.clone(),
+        )?;
+
+        let ff = FeedForward::new(cfg.clone())?;
+        let norm1 = LayerNorm::new_default(cfg.emb_dim, &device.clone())?;
+        let norm2 = LayerNorm::new_default(cfg.emb_dim, &device.clone())?;
+        let drop_shortcut = Dropout::new(cfg.drop_rate);
+        Ok(Self {
+            attention,
+            ff,
+            norm1,
+            norm2,
+            drop_shortcut,
+        })
+    }
+}
+
+impl Module for TransformerBlock {
+    fn forward(&self, x: &Tensor) -> Result<Tensor, Error> {
+        let shortcut = x.clone();
+        let x = self.norm1.forward(x)?;
+        let x = self.attention.forward(&x)?;
+        let x = self.drop_shortcut.forward(&x)?;
+        let x = x.broadcast_add(&shortcut)?;
+
+        let shortcut = x.clone();
+        let x = self.norm2.forward(&x)?;
+        let x = self.ff.forward(&x)?;
+        let x = self.drop_shortcut.forward(&x)?;
+        let x = x.broadcast_add(&shortcut)?;
+
+        Ok(x)
     }
 }
