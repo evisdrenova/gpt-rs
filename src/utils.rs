@@ -1,4 +1,5 @@
-use candle_core::{Error, Tensor};
+use candle_core::{Device, Error, Tensor};
+use tiktoken_rs::CoreBPE;
 
 use crate::{activations::Activations, gpt::GPT};
 
@@ -46,4 +47,19 @@ pub fn generate_text_loop(
         idx = Tensor::cat(&[idx, idx_next], 1)?;
     }
     Ok(idx)
+}
+
+pub fn text_to_token_ids(text: &str, tokenizer: &CoreBPE) -> Result<Tensor, Error> {
+    let encoded = tokenizer.encode_with_special_tokens(text);
+    let encoded_tensor = Tensor::from_vec(encoded.clone(), (1, encoded.len()), &Device::Cpu)?;
+    Ok(encoded_tensor)
+}
+
+pub fn token_ids_to_text(token_ids: &Tensor, tokenizer: &CoreBPE) -> Result<String, Error> {
+    let flat = token_ids.squeeze(0)?;
+    let vec: Vec<u32> = flat.to_vec1()?;
+    let output = tokenizer
+        .decode(vec)
+        .map_err(|e| Error::Msg(format!("Tokenizer decode error: {}", e)))?;
+    Ok(output)
 }
