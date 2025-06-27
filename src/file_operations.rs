@@ -2,6 +2,7 @@ use candle_core::{Device, Tensor};
 use rand::rng;
 use rand::seq::SliceRandom;
 use std::{
+    error::Error,
     fmt::{self},
     fs,
 };
@@ -12,6 +13,8 @@ pub enum SplitError {
     InvalidRatio(f32),
     EmptyData,
 }
+
+impl Error for SplitError {}
 
 impl fmt::Display for SplitError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

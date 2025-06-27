@@ -1,3 +1,4 @@
+use candle_core::shape::Dim;
 use candle_core::{Error, Tensor};
 use candle_nn::Module;
 use std::f32::consts;
@@ -6,29 +7,37 @@ pub struct Activations {}
 
 impl Activations {
     pub fn softmax(input: &Tensor, dim: Option<usize>) -> Result<Tensor, Error> {
-        // Softmax formula: softmax(x_i) = exp(x_i) / sum(exp(x_j) for all j)
+        // pick teh axis or default to last dim if none
+        let axis_usize = dim.unwrap_or_else(|| input.shape().dims().len() - 1);
+        let axis = axis_usize.to_index(input.shape(), "softmax")?;
+        let max = input.max_keepdim(axis)?;
+        let shifted = input.broadcast_sub(&max)?;
+        let exps = shifted.exp()?;
 
-        // Apply exponential function element-wise
-        let exp_values = input.exp()?;
+        let sum = exps.sum_keepdim(axis)?;
 
-        let softmax_result = match dim {
-            Some(dimension) => {
-                // Row-wise (or dimension-wise) softmax
-                // Sum along the specified dimension while keeping dimensions
-                let exp_sum = exp_values.sum_keepdim(dimension)?;
-                // Normalize: divide each element by the sum along that dimension
-                exp_values.broadcast_div(&exp_sum)?
-            }
-            None => {
-                // Sum all exponential values
-                let exp_sum = exp_values.sum_all()?;
-                // Normalize: divide each exp value by the total sum
-                exp_values.broadcast_div(&exp_sum)?
-            }
-        };
+        let probas = exps.broadcast_div(&sum)?;
 
-        Ok(softmax_result)
+        Ok(probas)
     }
+}
+
+pub fn log_softmax(input: &Tensor, dim: Option<usize>) -> Result<Tensor, Error> {
+    let axis_usize = dim.unwrap_or_else(|| input.shape().dims().len() - 1);
+    let axis = axis_usize.to_index(input.shape(), "log_softmax")?;
+
+    let max = input.max_keepdim(axis)?;
+    let shifted = input.broadcast_sub(&max)?;
+
+    let exps = shifted.exp()?;
+
+    let sum = exps.sum_keepdim(axis)?;
+
+    let lse = sum.log()? + &max;
+
+    let output = input.broadcast_sub(&lse?)?;
+
+    Ok(output)
 }
 
 pub struct GeLU {}

@@ -4,6 +4,7 @@ pub mod embedding;
 pub mod file_operations;
 pub mod gpt;
 pub mod layers;
+pub mod losses;
 pub mod module_list;
 pub mod neural_net;
 pub mod normalization;
