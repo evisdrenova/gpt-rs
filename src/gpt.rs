@@ -57,13 +57,11 @@ impl GPT {
             final_norm,
         })
     }
-
     pub fn forward(&self, in_indx: &Tensor) -> Result<Tensor, Error> {
         let dims = in_indx.shape().dims();
         let (_, seq_len) = parse_batch_and_seq(dims)?;
 
         let tok_embeds = self.tok_emb.forward(&in_indx)?;
-        // we need to output integers here so that we can use them in the embedding layer
         let arrange = Tensor::arange(0u32, seq_len as u32, &Device::Cpu)?;
 
         let pos_embeds = self.pos_emb.forward(&arrange)?;

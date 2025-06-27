@@ -1,13 +1,57 @@
 use candle_core::{Device, Tensor};
 use rand::rng;
 use rand::seq::SliceRandom;
-use std::fs;
+use std::{
+    fmt::{self},
+    fs,
+};
 use tiktoken_rs::{CoreBPE, r50k_base};
 
+#[derive(Debug)]
+pub enum SplitError {
+    InvalidRatio(f32),
+    EmptyData,
+}
+
+impl fmt::Display for SplitError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            SplitError::InvalidRatio(ratio) => {
+                write!(
+                    f,
+                    "Invalid train ratio: {}. Must be between 0.0 and 1.0",
+                    ratio
+                )
+            }
+            SplitError::EmptyData => write!(f, "Cannot split empty text data"),
+        }
+    }
+}
+
 pub fn load_file(file: &str) -> String {
+    println!("the file: {:?}", file);
     let raw_text = fs::read_to_string(file).expect("Failed to read file");
 
     raw_text
+}
+
+pub fn split_train_validation(
+    text_data: &str,
+    train_ratio: f32,
+) -> Result<(&str, &str), SplitError> {
+    if !(0.0..=1.0).contains(&train_ratio) {
+        return Err(SplitError::InvalidRatio(train_ratio));
+    }
+
+    if text_data.is_empty() {
+        return Err(SplitError::EmptyData);
+    }
+
+    let split_idx = (train_ratio * (text_data.len() as f32)) as usize;
+
+    let (train_data, validation_data) = text_data.split_at(split_idx);
+
+    Ok((train_data, validation_data))
 }
 
 pub struct GPTDataset {
