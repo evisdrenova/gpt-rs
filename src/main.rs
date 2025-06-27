@@ -71,15 +71,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("train length{}", train.len());
     println!("validatiohn length{}", validation.len());
 
-    // let dataloader = create_dataloader_v1(
-    //     &raw_text,
-    //     batch_size,
-    //     max_length as usize,
-    //     stride,
-    //     shuffle,
-    //     drop_last,
-    // )?;
-
     println!("Train loader:");
     for (batch_idx, batch_result) in train_loader.iter().enumerate() {
         let (inputs, targets) = batch_result?;
