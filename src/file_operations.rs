@@ -130,6 +130,17 @@ impl DataLoader {
         }
     }
 
+    pub fn len(&self) -> usize {
+        let ds_len = self.dataset.len();
+        let bs = self.batch_size;
+
+        if self.drop_last {
+            ds_len / bs
+        } else {
+            (ds_len + bs - 1) / bs
+        }
+    }
+
     // iterator on the data loader
     pub fn iter(&self) -> DataLoaderIterator {
         let mut indices: Vec<usize> = (0..self.dataset.len()).collect();
@@ -196,7 +207,21 @@ impl<'a> Iterator for DataLoaderIterator<'a> {
             (Err(e), _) | (_, Err(e)) => Some(Err(Box::new(e))),
         }
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.indices.len().saturating_sub(self.current);
+        let bs = self.batch_size;
+
+        let batches = if self.drop_last {
+            remaining / bs
+        } else {
+            (remaining + bs - 1) / bs
+        };
+        (batches, Some(batches))
+    }
 }
+
+impl<'a> ExactSizeIterator for DataLoaderIterator<'a> {}
 
 pub fn create_dataloader_v1(
     txt: &str,

@@ -13,21 +13,3 @@ pub fn cross_entropy_loss(logits: &Tensor, target: &Tensor) -> Result<Tensor, Er
     // returns a 0dim scalar tensor
     Ok(mean_log_prob.neg()?)
 }
-
-pub fn calc_loss_batch(
-    input: &Tensor,
-    target: &Tensor,
-    model: GPT,
-    device: Device,
-) -> Result<Tensor, Error> {
-    let input = input.to_device(&device)?;
-    let target = target.to_device(&device)?;
-
-    let logits = model.forward(&input)?;
-
-    let logits_flat = logits.flatten(0, 1)?;
-    let target_flat = target.flatten_all()?;
-
-    let loss = cross_entropy_loss(&logits_flat, &target_flat)?;
-    Ok(loss)
-}
