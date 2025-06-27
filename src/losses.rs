@@ -1,13 +1,9 @@
-use candle_core::{Device, Error, Tensor};
-use candle_nn::ops::log_softmax;
+use candle_core::{Error, Tensor};
 
-pub fn cross_entropy_loss(
-    input: &Tensor,
-    target: &Tensor,
-    batch: &Tensor,
-    device: Device,
-) -> Result<Tensor, Error> {
-    let log_probs = log_softmax(logits, 1)?;
+use crate::activations::Activations;
+
+pub fn cross_entropy_loss(logits: &Tensor, target: &Tensor) -> Result<Tensor, Error> {
+    let log_probs = Activations::log_softmax(logits, Some(1))?;
     // gather log probabilities at the class indixes
     let idx = target.unsqueeze(1)?;
 
@@ -17,5 +13,5 @@ pub fn cross_entropy_loss(
 
     let mean_log_prob = flattened.mean(0)?;
 
-    Ok(mean_log_prob.neg())
+    Ok(mean_log_prob.neg()?)
 }

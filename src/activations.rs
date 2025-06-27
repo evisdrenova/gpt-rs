@@ -20,24 +20,24 @@ impl Activations {
 
         Ok(probas)
     }
-}
 
-pub fn log_softmax(input: &Tensor, dim: Option<usize>) -> Result<Tensor, Error> {
-    let axis_usize = dim.unwrap_or_else(|| input.shape().dims().len() - 1);
-    let axis = axis_usize.to_index(input.shape(), "log_softmax")?;
+    pub fn log_softmax(input: &Tensor, dim: Option<usize>) -> Result<Tensor, Error> {
+        let axis_usize = dim.unwrap_or_else(|| input.shape().dims().len() - 1);
+        let axis = axis_usize.to_index(input.shape(), "log_softmax")?;
 
-    let max = input.max_keepdim(axis)?;
-    let shifted = input.broadcast_sub(&max)?;
+        let max = input.max_keepdim(axis)?;
+        let shifted = input.broadcast_sub(&max)?;
 
-    let exps = shifted.exp()?;
+        let exps = shifted.exp()?;
 
-    let sum = exps.sum_keepdim(axis)?;
+        let sum = exps.sum_keepdim(axis)?;
 
-    let lse = sum.log()? + &max;
+        let lse = sum.log()? + &max;
 
-    let output = input.broadcast_sub(&lse?)?;
+        let output = input.broadcast_sub(&lse?)?;
 
-    Ok(output)
+        Ok(output)
+    }
 }
 
 pub struct GeLU {}
