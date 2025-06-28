@@ -3,7 +3,7 @@ use candle_core::{Device, Tensor};
 use crate::{
     file_operations::split_train_validation,
     gpt::{GPT, GPTConfig},
-    utils::{generate_text_loop, token_ids_to_text},
+    utils::{calc_loss_batch, calc_loss_loader, generate_text_loop, token_ids_to_text},
 };
 use file_operations::{create_dataloader_v1, load_file};
 
@@ -90,6 +90,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             targets.shape()
         );
     }
+    let mut model = GPT::new(GPT_CONFIG_124M.clone())?;
+
+    println!("loader len {}", val_loader.len());
+    let train_loss = calc_loss_loader(train_loader, &model, &Device::Cpu, 0)?;
+
+    let validation_loss = calc_loss_loader(val_loader, &model, &Device::Cpu, 0)?;
+
+    println!("validation_loss {}", train_loss);
+    println!("lvalidation_loss {}", validation_loss);
 
     // let tokenizer = tiktoken_rs::r50k_base()?;
 
