@@ -19,6 +19,15 @@ impl Embedding {
         Ok(Embedding { weights })
     }
 
+    pub fn from_weights(weights: Tensor) -> Result<Self> {
+        let weight_dims = weights.dims();
+        if weight_dims.len() != 2 {
+            return Err(candle_core::Error::Msg("Weight tensor must be 2D".into()));
+        }
+
+        Ok(Embedding { weights })
+    }
+
     pub fn forward(&self, token_ids: &Tensor) -> Result<Tensor> {
         let shape = token_ids.dims();
 
