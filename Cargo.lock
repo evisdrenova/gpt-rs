@@ -629,6 +629,7 @@ dependencies = [
  "indexmap",
  "once_cell",
  "rand",
+ "rayon",
  "regex",
  "tiktoken-rs",
 ]

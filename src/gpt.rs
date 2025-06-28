@@ -1,5 +1,6 @@
 use candle_core::{Device, Error, Tensor};
 use candle_nn::Module;
+use rayon::prelude::*;
 use std::time::Instant;
 
 use crate::{
@@ -31,102 +32,36 @@ pub struct GPT {
 }
 
 impl GPT {
-    // pub fn new(cfg: GPTConfig) -> Result<Self, Error> {
-    //     let device = Device::Cpu;
-
-    //     let tok_emb = Embedding::new(cfg.vocab_size, cfg.emb_dim, device.clone())?;
-    //     let pos_emb = Embedding::new(cfg.context_length, cfg.emb_dim, device.clone())?;
-
-    //     let drop_emb = Dropout::new(cfg.drop_rate);
-
-    //     let mut trf_blocks: Vec<TransformerBlock> = Vec::new();
-    //     for _ in 0..cfg.n_layers {
-    //         let block: TransformerBlock = TransformerBlock::new(&cfg)?;
-    //         trf_blocks.push(block);
-    //     }
-
-    //     let final_norm = LayerNorm::new(cfg.emb_dim, 0.00001, &device)?;
-
-    //     let out_head = Linear::new(cfg.emb_dim, cfg.vocab_size, false, &device)?;
-
-    //     Ok(GPT {
-    //         tok_emb,
-    //         pos_emb,
-    //         out_head,
-    //         drop_emb,
-    //         trf_blocks,
-    //         final_norm,
-    //     })
-    // }
-
     pub fn new(cfg: GPTConfig) -> Result<Self, Error> {
-        let init_start = Instant::now();
-        println!("🔧 Starting GPT model initialization...");
-
         let device = Device::Cpu;
 
-        // Create shared embedding weights once (replaces both token embedding and output head)
-        let step_start = Instant::now();
+        let total_params = cfg.vocab_size * cfg.emb_dim;
+        let init_range = 0.1;
+
+        let weight_data =
+            crate::rng::random_vec_f32_parallel(total_params, -init_range, init_range);
+
         let shared_emb_weights =
-            Tensor::randn(0.0f32, 1.0f32, &[cfg.vocab_size, cfg.emb_dim], &device)?;
-        println!(
-            "⏱️  Shared embedding weights ({} x {}): {:?}",
-            cfg.vocab_size,
-            cfg.emb_dim,
-            step_start.elapsed()
-        );
-
-        // Time token embedding creation (using shared weights - should be ~instant)
-        let step_start = Instant::now();
+            Tensor::from_vec(weight_data, (cfg.vocab_size, cfg.emb_dim), &device)?;
         let tok_emb = Embedding::from_weights(shared_emb_weights.clone())?;
-        println!(
-            "⏱️  Token embedding (from shared): {:?}",
-            step_start.elapsed()
-        );
 
-        // Time position embedding creation
-        let step_start = Instant::now();
         let pos_emb = Embedding::new(cfg.context_length, cfg.emb_dim, device.clone())?;
-        println!(
-            "⏱️  Position embedding ({} x {}): {:?}",
-            cfg.context_length,
-            cfg.emb_dim,
-            step_start.elapsed()
-        );
 
-        // Time dropout creation
-        let step_start = Instant::now();
         let drop_emb = Dropout::new(cfg.drop_rate);
-        println!("⏱️  Dropout creation: {:?}", step_start.elapsed());
 
-        // Time transformer blocks creation
-        let step_start = Instant::now();
-        let mut trf_blocks: Vec<TransformerBlock> = Vec::new();
-        println!("🔄 Creating {} transformer blocks...", cfg.n_layers);
+        let trf_blocks: Result<Vec<TransformerBlock>, Error> = (0..cfg.n_layers)
+            .into_par_iter()
+            .map(|i| {
+                let block = TransformerBlock::new(&cfg)?;
+                Ok(block)
+            })
+            .collect();
 
-        for i in 0..cfg.n_layers {
-            let block_start = Instant::now();
-            let block: TransformerBlock = TransformerBlock::new(&cfg)?;
-            println!("  📦 Block {}: {:?}", i, block_start.elapsed());
-            trf_blocks.push(block);
-        }
-        println!("⏱️  All transformer blocks: {:?}", step_start.elapsed());
-
-        // Time layer norm creation
-        let step_start = Instant::now();
+        let trf_blocks = trf_blocks?;
         let final_norm = LayerNorm::new(cfg.emb_dim, 0.00001, &device)?;
-        println!("⏱️  Final layer norm: {:?}", step_start.elapsed());
 
-        // Time output head creation (using transposed shared weights - should be ~instant)
-        let step_start = Instant::now();
-        let transposed_weights = shared_emb_weights.t()?; // Transpose: [vocab_size, emb_dim] -> [emb_dim, vocab_size]
+        let transposed_weights = shared_emb_weights.t()?;
         let out_head = Linear::from_weights(transposed_weights, None)?;
-        println!(
-            "⏱️  Output head (from shared, transposed): {:?}",
-            step_start.elapsed()
-        );
-
-        println!("✅ Total GPT initialization: {:?}", init_start.elapsed());
 
         Ok(GPT {
             tok_emb,
@@ -166,7 +101,6 @@ impl GPT {
         }
     }
 
-    // Set model to evaluation mode (disables dropout)
     pub fn eval(&mut self) {
         self.drop_emb.eval();
 

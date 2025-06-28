@@ -4,12 +4,10 @@ pub struct Embedding {
     pub weights: Tensor,
 }
 
-// an emebdding layer is essentialy a single weight-matrix of shape(vocab_size * output_dim) plus a lookup operation at inference time
-// we can allocate a tensor of shape[vocab_size*output_dim] to hold our weights
-// then for a given batch of tokenIds, we can index-select along the 0th dimension of the embedding-weight matrix
 impl Embedding {
     // creates a weight matrix with mean 0, std of 1 and shape[vocab_size*output_dim
     pub fn new(vocab_size: usize, output_dim: usize, device: Device) -> Result<Embedding> {
+        // this is actually faster than parallelizing this i think due to the overhead of thread scheduling
         let weights = Tensor::randn(
             0.0f32,
             1.0f32,

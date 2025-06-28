@@ -16,9 +16,15 @@ pub struct FeedForward {
 
 impl FeedForward {
     pub fn new(cfg: GPTConfig) -> Result<Self, Error> {
-        let layer1 = Linear::new(cfg.emb_dim, 4 * cfg.emb_dim, true, &Device::Cpu)?;
+        let (layer1_result, layer2_result) = rayon::join(
+            || Linear::new(cfg.emb_dim, 4 * cfg.emb_dim, true, &Device::Cpu),
+            || Linear::new(4 * cfg.emb_dim, cfg.emb_dim, true, &Device::Cpu),
+        );
+
+        let layer1 = layer1_result?;
+        let layer2 = layer2_result?;
+
         let gelu = GeLU::new()?;
-        let layer2 = Linear::new(4 * cfg.emb_dim, cfg.emb_dim, true, &Device::Cpu)?;
 
         Ok(FeedForward {
             layer1,
@@ -62,6 +68,7 @@ pub struct TransformerBlock {
 impl TransformerBlock {
     pub fn new(cfg: &GPTConfig) -> Result<Self, Error> {
         let device = Device::Cpu;
+
         let attention = MultiHeadAttention::new(
             cfg.emb_dim,
             cfg.emb_dim,
@@ -76,6 +83,7 @@ impl TransformerBlock {
         let norm1 = LayerNorm::new_default(cfg.emb_dim, &device.clone())?;
         let norm2 = LayerNorm::new_default(cfg.emb_dim, &device.clone())?;
         let drop_shortcut = Dropout::new(cfg.drop_rate);
+
         Ok(Self {
             attention,
             ff,

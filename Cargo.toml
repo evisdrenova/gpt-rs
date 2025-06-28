@@ -10,6 +10,7 @@ criterion = "0.6.0"
 indexmap = "2.9.0"
 once_cell = "1.21.3"
 rand = "0.9.1"
+rayon = "1.10.0"
 regex = "1.11.1"
 tiktoken-rs = "0.7.0"
 

@@ -21,11 +21,7 @@ impl Linear {
         let std_dev = (2.0 / (in_features + out_features) as f64).sqrt() as f32;
         let bound = std_dev * (3.0_f32).sqrt();
 
-        let weight_data: Vec<f32> = (0..in_features * out_features)
-            .map(|_| rng::random_range_f32(-bound, bound))
-            .collect();
-
-        let weight = Tensor::from_vec(weight_data, (out_features, in_features), device)?;
+        let weight = Tensor::rand(-bound, bound, &[out_features, in_features], device)?;
 
         let bias = if bias {
             Some(Tensor::zeros(

@@ -1,34 +1,54 @@
-use once_cell::sync::OnceCell;
-use rand::{Rng, RngCore, SeedableRng, rngs::StdRng};
-use std::sync::Mutex;
+use rand::{Rng, SeedableRng, rng as thread_rng};
+use rayon::prelude::*;
+use std::cell::RefCell;
 
-static GLOBAL_RNG: OnceCell<Mutex<StdRng>> = OnceCell::new();
+// Optional: For deterministic seeding per thread
+thread_local! {
+    static SEEDED_RNG: RefCell<Option<rand::rngs::StdRng>> = RefCell::new(None);
+}
 
-//init the global rng
+/// Initialize with a seed (optional - for reproducibility)
 pub fn seed(seed: u64) {
-    let rng = StdRng::seed_from_u64(seed);
-    // ignored if already initialized
-    let _ = GLOBAL_RNG.set(Mutex::new(rng));
+    SEEDED_RNG.with(|rng_cell| {
+        *rng_cell.borrow_mut() = Some(rand::rngs::StdRng::seed_from_u64(seed));
+    });
 }
 
-/// Obtain a locked handle to the global RNG
-pub fn rng() -> std::sync::MutexGuard<'static, StdRng> {
-    GLOBAL_RNG
-        .get_or_init(|| {
-            // this closure runs only once, on first access
-            Mutex::new(StdRng::from_os_rng())
-        })
-        .lock()
-        .expect("RNG mutex poisoned")
-}
-/// Draw a random f32 in [0,1)
+/// Fast thread-local random f32 in [0,1)
 pub fn random_f32() -> f32 {
-    let mut r = rng();
-    r.next_u32() as f32 / (u32::MAX as f32)
+    thread_rng().random()
 }
 
-/// Draw a random f32 in [lo, hi)
+/// Fast thread-local random f32 in [lo, hi)
 pub fn random_range_f32(lo: f32, hi: f32) -> f32 {
-    let mut r = rng();
-    r.random_range(lo..hi)
+    thread_rng().random_range(lo..hi)
+}
+
+/// Bulk generation for large tensors (MUCH FASTER)
+pub fn random_vec_f32(count: usize, lo: f32, hi: f32) -> Vec<f32> {
+    let mut rng_instance = thread_rng();
+    (0..count)
+        .map(|_| rng_instance.random_range(lo..hi))
+        .collect()
+}
+
+/// Compatibility function - keep your existing API
+pub fn rng() -> impl Rng {
+    thread_rng()
+}
+
+pub fn random_vec_f32_parallel(count: usize, lo: f32, hi: f32) -> Vec<f32> {
+    let chunk_size = 100_000; // 100k numbers per chunk
+
+    (0..count)
+        .into_par_iter()
+        .chunks(chunk_size)
+        .flat_map(|chunk| {
+            let mut rng = thread_rng(); // Each thread gets its own RNG
+            chunk
+                .into_iter()
+                .map(|_| rng.random_range(lo..hi))
+                .collect::<Vec<_>>()
+        })
+        .collect()
 }
