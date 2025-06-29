@@ -27,7 +27,7 @@ pub fn random_range_f32(lo: f32, hi: f32) -> f32 {
 /// Bulk generation for large tensors (MUCH FASTER)
 pub fn random_vec_f32(count: usize, lo: f32, hi: f32) -> Vec<f32> {
     let mut rng_instance = thread_rng();
-    (0..count)
+    (0..count)                    
         .map(|_| rng_instance.random_range(lo..hi))
         .collect()
 }

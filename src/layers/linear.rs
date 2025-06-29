@@ -39,21 +39,6 @@ impl Linear {
             in_features,
         })
     }
-
-    pub fn from_weights(weight: Tensor, bias: Option<Tensor>) -> Result<Self, Error> {
-        let weight_dims = weight.dims();
-        if weight_dims.len() != 2 {
-            return Err(Error::Msg("Weight tensor must be 2D".into()));
-        }
-
-        let in_features = weight_dims[1];
-
-        Ok(Linear {
-            weight,
-            bias,
-            in_features,
-        })
-    }
 }
 
 impl Module for Linear {

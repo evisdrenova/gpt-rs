@@ -126,23 +126,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut model = GPT::new(GPT_CONFIG_124M.clone())?;
     println!("⏱️  Model initialization: {:?}", step_start.elapsed());
 
-    // // Step 5: Set model to eval mode
-    // let step_start = Instant::now();
-    // // For training
-    // //model.train(); // Enables dropouts
-    // //For inference/evaluation
-    // model.eval(); // Disables dropout (like your Python code)
-    // println!("⏱️  Model eval mode setup: {:?}", step_start.elapsed());
+    // Step 5: Set model to eval mode
+    let step_start = Instant::now();
+    // For training
+    //model.train(); // Enables dropouts
+    //For inference/evaluation
+    model.eval(); // Disables dropout (like your Python code)
+    println!("⏱️  Model eval mode setup: {:?}", step_start.elapsed());
 
-    // // Step 6: Generate text
-    // let step_start = Instant::now();
-    // let out: Tensor = generate_text_loop(
-    //     &model,
-    //     encoded_tensor.clone(),
-    //     10,
-    //     GPT_CONFIG_124M.context_length,
-    // )?;
-    // println!("⏱️  Text generation: {:?}", step_start.elapsed());
+    // Step 6: Generate text
+    let step_start = Instant::now();
+    let out: Tensor = generate_text_loop(
+        &model,
+        encoded_tensor.clone(),
+        10,
+        GPT_CONFIG_124M.context_length,
+    )?;
+    println!("⏱️  Text generation: {:?}", step_start.elapsed());
 
     // println!("=== Generation Results ===");
     // println!("Output tensor: {:?}", out);
