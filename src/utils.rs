@@ -1,14 +1,14 @@
 use std::{cmp::min_by, f32};
 
-use candle_core::{Device, Error, Tensor};
-use tiktoken_rs::CoreBPE;
-
 use crate::{
     activations::Activations,
     file_operations::{DataLoader, DataLoaderIterator},
     gpt::GPT,
     losses::cross_entropy_loss,
 };
+use candle_core::{Device, Error, Tensor};
+use std::time::Instant;
+use tiktoken_rs::CoreBPE;
 
 pub fn parse_batch_and_seq(dims: &[usize]) -> Result<(usize, usize), Error> {
     match dims.len() {
@@ -22,15 +22,58 @@ pub fn parse_batch_and_seq(dims: &[usize]) -> Result<(usize, usize), Error> {
     }
 }
 
+// pub fn generate_text_loop(
+//     model: &GPT,
+//     mut idx: Tensor,
+//     max_new_tokens: usize,
+//     context_size: usize,
+// ) -> Result<Tensor, Error> {
+//     // Generate tokens one by one
+//     for _ in 0..max_new_tokens {
+//         // Crop current context if it exceeds the supported context size
+//         let seq_len = idx.dim(1)?;
+//         let idx_cond = if seq_len > context_size {
+//             let start_idx = seq_len - context_size;
+//             idx.narrow(1, start_idx, context_size)?
+//         } else {
+//             idx.clone()
+//         };
+
+//         let logits = model.forward(&idx_cond)?;
+
+//         let last_token_logits = logits.narrow(1, logits.dim(1)? - 1, 1)?;
+
+//         let last_token_logits = last_token_logits.squeeze(1)?;
+
+//         let probas = Activations::softmax(&last_token_logits, Some(last_token_logits.rank() - 1))?;
+
+//         let idx_next = probas.argmax(probas.rank() - 1)?;
+
+//         let idx_next = idx_next.unsqueeze(1)?;
+
+//         idx = Tensor::cat(&[idx, idx_next], 1)?;
+//     }
+//     Ok(idx)
+// }
+
 pub fn generate_text_loop(
     model: &GPT,
     mut idx: Tensor,
     max_new_tokens: usize,
     context_size: usize,
 ) -> Result<Tensor, Error> {
+    let generation_start = Instant::now();
+    println!(
+        "🔄 Starting text generation for {} tokens...",
+        max_new_tokens
+    );
+
     // Generate tokens one by one
-    for _ in 0..max_new_tokens {
-        // Crop current context if it exceeds the supported context size
+    for i in 0..max_new_tokens {
+        let token_start = Instant::now();
+
+        // Time context cropping
+        let crop_start = Instant::now();
         let seq_len = idx.dim(1)?;
         let idx_cond = if seq_len > context_size {
             let start_idx = seq_len - context_size;
@@ -38,21 +81,56 @@ pub fn generate_text_loop(
         } else {
             idx.clone()
         };
+        let crop_time = crop_start.elapsed();
 
+        // Time model forward pass (likely the bottleneck)
+        let forward_start = Instant::now();
         let logits = model.forward(&idx_cond)?;
+        let forward_time = forward_start.elapsed();
 
+        // Time logits processing
+        let logits_start = Instant::now();
         let last_token_logits = logits.narrow(1, logits.dim(1)? - 1, 1)?;
-
         let last_token_logits = last_token_logits.squeeze(1)?;
+        let logits_time = logits_start.elapsed();
 
+        // Time softmax
+        let softmax_start = Instant::now();
         let probas = Activations::softmax(&last_token_logits, Some(last_token_logits.rank() - 1))?;
+        let softmax_time = softmax_start.elapsed();
 
+        // Time sampling
+        let sampling_start = Instant::now();
         let idx_next = probas.argmax(probas.rank() - 1)?;
-
         let idx_next = idx_next.unsqueeze(1)?;
+        let sampling_time = sampling_start.elapsed();
 
+        // Time concatenation
+        let concat_start = Instant::now();
         idx = Tensor::cat(&[idx, idx_next], 1)?;
+        let concat_time = concat_start.elapsed();
+
+        let total_token_time = token_start.elapsed();
+
+        println!(
+            "  🔢 Token {}: {:?} (forward: {:?}, crop: {:?}, logits: {:?}, softmax: {:?}, sample: {:?}, concat: {:?})",
+            i + 1,
+            total_token_time,
+            forward_time,
+            crop_time,
+            logits_time,
+            softmax_time,
+            sampling_time,
+            concat_time
+        );
     }
+
+    let total_time = generation_start.elapsed();
+    let avg_per_token = total_time.as_secs_f64() / max_new_tokens as f64;
+
+    println!("⏱️  Total generation time: {:?}", total_time);
+    println!("⏱️  Average per token: {:.3}s", avg_per_token);
+
     Ok(idx)
 }
 

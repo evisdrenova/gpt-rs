@@ -62,23 +62,51 @@ impl GPT {
         })
     }
 
-    pub fn forward(&self, in_indx: &Tensor) -> Result<Tensor, Error> {
-        let dims = in_indx.shape().dims();
-        let (_, seq_len) = parse_batch_and_seq(dims)?;
+    pub fn forward(&self, in_idx: &Tensor) -> Result<Tensor, Error> {
+        let forward_start = Instant::now();
 
-        let tok_embeds = self.tok_emb.forward(&in_indx)?;
-        let arrange = Tensor::arange(0u32, seq_len as u32, &Device::Cpu)?;
+        // Time token embeddings
+        let emb_start = Instant::now();
+        let batch_size = in_idx.dim(0)?;
+        let seq_len = in_idx.dim(1)?;
+        let tok_embeds = self.tok_emb.forward(in_idx)?;
+        let emb_time = emb_start.elapsed();
 
-        let pos_embeds = self.pos_emb.forward(&arrange)?;
-        let embeddings = tok_embeds.broadcast_add(&pos_embeds)?;
+        // Time position embeddings
+        let pos_start = Instant::now();
+        let pos_indices = Tensor::arange(0, seq_len as i64, &Device::Cpu)?;
+        let pos_embeds = self.pos_emb.forward(&pos_indices)?;
+        let pos_time = pos_start.elapsed();
 
-        let mut x = self.drop_emb.forward(&embeddings)?;
+        // Time embedding addition
+        let add_start = Instant::now();
+        let x = tok_embeds.broadcast_add(&pos_embeds)?;
+        let x = self.drop_emb.forward(&x)?;
+        let add_time = add_start.elapsed();
 
-        for block in &self.trf_blocks {
+        // Time transformer blocks (likely the biggest bottleneck)
+        let blocks_start = Instant::now();
+        let mut x = x;
+        for (i, block) in self.trf_blocks.iter().enumerate() {
+            let block_start = Instant::now();
             x = block.forward(&x)?;
+            println!("    📦 Block {} forward: {:?}", i, block_start.elapsed());
         }
-        let normalized_output = self.final_norm.forward(&x)?;
-        let logits = self.out_head.forward(&normalized_output)?;
+        let blocks_time = blocks_start.elapsed();
+
+        // Time final operations
+        let final_start = Instant::now();
+        let x = self.final_norm.forward(&x)?;
+        let logits = self.out_head.forward(&x)?;
+        let final_time = final_start.elapsed();
+
+        let total_forward_time = forward_start.elapsed();
+
+        println!(
+            "  🧠 Forward pass: {:?} (emb: {:?}, pos: {:?}, add: {:?}, blocks: {:?}, final: {:?})",
+            total_forward_time, emb_time, pos_time, add_time, blocks_time, final_time
+        );
+
         Ok(logits)
     }
 
