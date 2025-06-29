@@ -33,75 +33,24 @@ pub struct GPT {
 
 impl GPT {
     pub fn new(cfg: GPTConfig) -> Result<Self, Error> {
-        let init_start = Instant::now();
-        println!("🔧 Starting GPT model initialization (no weight sharing)...");
-
         let device = Device::Cpu;
 
-        // Create token embedding (separate)
-        let step_start = Instant::now();
         let tok_emb = Embedding::new(cfg.vocab_size, cfg.emb_dim, device.clone())?;
-        println!(
-            "⏱️  Token embedding ({} x {}): {:?}",
-            cfg.vocab_size,
-            cfg.emb_dim,
-            step_start.elapsed()
-        );
-
-        // Create position embedding
-        let step_start = Instant::now();
         let pos_emb = Embedding::new(cfg.context_length, cfg.emb_dim, device.clone())?;
-        println!(
-            "⏱️  Position embedding ({} x {}): {:?}",
-            cfg.context_length,
-            cfg.emb_dim,
-            step_start.elapsed()
-        );
-
-        // Create dropout
-        let step_start = Instant::now();
         let drop_emb = Dropout::new(cfg.drop_rate);
-        println!("⏱️  Dropout creation: {:?}", step_start.elapsed());
-
-        // Create transformer blocks in parallel
-        let step_start = Instant::now();
-        println!(
-            "🔄 Creating {} transformer blocks with rayon...",
-            cfg.n_layers
-        );
 
         let trf_blocks: Result<Vec<TransformerBlock>, Error> = (0..cfg.n_layers)
             .into_par_iter()
             .map(|i| {
-                let block_start = Instant::now();
                 let block = TransformerBlock::new(&cfg)?;
-                println!("  📦 Block {} (rayon): {:?}", i, block_start.elapsed());
                 Ok(block)
             })
             .collect();
 
         let trf_blocks = trf_blocks?;
-        println!(
-            "⏱️  All transformer blocks (rayon): {:?}",
-            step_start.elapsed()
-        );
-
-        // Create final layer norm
-        let step_start = Instant::now();
         let final_norm = LayerNorm::new(cfg.emb_dim, 0.00001, &device)?;
-        println!("⏱️  Final layer norm: {:?}", step_start.elapsed());
 
-        // Create output head (separate Linear layer)
-        let step_start = Instant::now();
         let out_head = Linear::new(cfg.emb_dim, cfg.vocab_size, false, &device)?;
-        println!(
-            "⏱️  Output head ({} x {}): {:?}",
-            cfg.emb_dim,
-            cfg.vocab_size,
-            step_start.elapsed()
-        );
-
-        println!("✅ Total GPT initialization: {:?}", init_start.elapsed());
 
         Ok(GPT {
             tok_emb,
