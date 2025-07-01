@@ -204,9 +204,9 @@ pub fn calc_loss_loader(
 }
 
 pub struct ModelTrainResponse {
-    pub train_loss: f32,
-    pub validation_loss: f32,
-    pub track_tokens_seen: usize,
+    pub train_losses: Vec<f32>,
+    pub validation_losses: Vec<f32>,
+    pub track_tokens_seen: Vec<usize>,
 }
 
 pub fn train_model_simple(
@@ -262,8 +262,8 @@ pub fn train_model_simple(
     }
 
     Ok(ModelTrainResponse {
-        train_loss,
-        validation_loss,
+        train_losses,
+        validation_losses,
         track_tokens_seen,
     })
 }
