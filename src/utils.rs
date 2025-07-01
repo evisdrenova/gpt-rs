@@ -267,3 +267,19 @@ pub fn train_model_simple(
         track_tokens_seen,
     })
 }
+
+pub fn evaluate_model(
+    model: &mut GPT,
+    train_loader: DataLoader,
+    validation_loader: DataLoader,
+    device: &Device,
+    eval_iter: usize,
+) -> Result<(f32, f32), Error> {
+    model.eval();
+    let train_loss = calc_loss_loader(train_loader, model, device, eval_iter)?;
+
+    let validation_loss = calc_loss_loader(validation_loader, model, device, eval_iter)?;
+
+    model.train();
+    Ok((train_loss, validation_loss))
+}
