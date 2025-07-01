@@ -180,3 +180,5 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+// refine adamw optimizer and optimize block speed

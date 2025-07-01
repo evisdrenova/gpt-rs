@@ -8,5 +8,6 @@ pub mod losses;
 pub mod module_list;
 pub mod neural_net;
 pub mod normalization;
+pub mod optimizers;
 pub mod rng;
 pub mod utils;
