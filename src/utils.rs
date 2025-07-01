@@ -202,3 +202,53 @@ pub fn calc_loss_loader(
     }
     Ok(total_loss / (num_batches as f32))
 }
+
+pub struct ModelTrainResponse {
+    pub train_loss: f32,
+    pub validation_loss: f32,
+    pub track_tokens_seen: usize,
+}
+
+pub fn train_model_simple(
+    model: &GPT,
+    train_loader: DataLoader,
+    validation_loader: DataLoader,
+    optimizer: Optimizer,
+    device: &Device,
+    num_epochs: usize,
+    eval_freq: usize,
+    eval_iter: usize,
+    start_context: usize,
+    tokenizer: &CoreBPE,
+) -> Result<ModelTrainResponse, Error> {
+
+
+    let train_losse: Vec<f32> = Vec::new();
+    let validation_losses:  Vec<f32> = Vec::new();
+    let track_tokens_seen: Vec<usize> = Vec::new();
+    let tokens_seen: usize = 0;
+    let global_step:usize = -1;
+
+
+    for e in 0..num_epochs {
+        model.train();
+
+        for (batch_idx, batch_result) in train_loader.iter().enumerate() {
+            let (inputs, targets) = batch_result?;
+
+            optimizer.zero_grad();
+            let loss
+            println!(
+                "torch.Size({:?}) torch.Size({:?})",
+                inputs.shape(),
+                targets.shape()
+            );
+        }
+    }
+
+    Ok(ModelTrainResponse {
+        train_loss,
+        validation_loss,
+        track_tokens_seen,
+    })
+}
