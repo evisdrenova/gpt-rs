@@ -210,10 +210,10 @@ pub struct ModelTrainResponse {
 }
 
 pub fn train_model_simple(
-    model: &GPT,
+    model: &mut GPT,
     train_loader: DataLoader,
     validation_loader: DataLoader,
-    optimizer: Optimizer,
+    optimizer: &mut Optimizer,
     device: &Device,
     num_epochs: usize,
     eval_freq: usize,
@@ -221,14 +221,11 @@ pub fn train_model_simple(
     start_context: usize,
     tokenizer: &CoreBPE,
 ) -> Result<ModelTrainResponse, Error> {
-
-
-    let train_losse: Vec<f32> = Vec::new();
-    let validation_losses:  Vec<f32> = Vec::new();
-    let track_tokens_seen: Vec<usize> = Vec::new();
-    let tokens_seen: usize = 0;
-    let global_step:usize = -1;
-
+    let mut train_losses: Vec<f32> = Vec::new();
+    let mut validation_losses: Vec<f32> = Vec::new();
+    let mut track_tokens_seen: Vec<usize> = Vec::new();
+    let mut tokens_seen: usize = 0;
+    let mut global_step: usize = 0;
 
     for e in 0..num_epochs {
         model.train();
@@ -237,12 +234,30 @@ pub fn train_model_simple(
             let (inputs, targets) = batch_result?;
 
             optimizer.zero_grad();
-            let loss
-            println!(
-                "torch.Size({:?}) torch.Size({:?})",
-                inputs.shape(),
-                targets.shape()
-            );
+            let loss = calc_loss_batch(&inputs, &targets, model, device)?;
+            loss.backward();
+            optimizer.step();
+
+            tokens_seen += inputs.numel();
+            global_step += 1;
+
+            if global_step % eval_freq == 0 {
+                let (train_loss, validation_loss) =
+                    evaluate_model(model, &train_loader, &validation_loader, device, eval_iter)?;
+
+                train_losses.push(train_loss);
+                validation_losses.push(validation_loss);
+                track_tokens_seen.push(tokens_seen);
+                println!(
+                    "Ep {} (Step {:06}): Train loss {:.3}, Val loss {:.3}",
+                    e + 1,
+                    global_step,
+                    train_loss,
+                    validation_loss
+                );
+
+                generate_and_print_sample(model, tokenizer, device, start_context)?;
+            }
         }
     }
 
