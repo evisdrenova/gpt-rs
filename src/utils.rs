@@ -218,7 +218,7 @@ pub fn train_model_simple(
     num_epochs: usize,
     eval_freq: usize,
     eval_iter: usize,
-    start_context: usize,
+    start_context: &str,
     tokenizer: &CoreBPE,
 ) -> Result<ModelTrainResponse, Error> {
     let mut train_losses: Vec<f32> = Vec::new();
@@ -268,6 +268,7 @@ pub fn train_model_simple(
     })
 }
 
+/// prints training and validation loss after each model update
 pub fn evaluate_model(
     model: &mut GPT,
     train_loader: DataLoader,
@@ -282,4 +283,26 @@ pub fn evaluate_model(
 
     model.train();
     Ok((train_loss, validation_loss))
+}
+
+pub fn generate_and_print_sample(
+    model: &mut GPT,
+    tokenizer: &CoreBPE,
+    device: &Device,
+    start_context: &str,
+) -> Result<String, Error> {
+    model.eval();
+    let context_size = model.pos_emb.weights.shape().dims()[0];
+
+    let encoded = text_to_token_ids(start_context, tokenizer)?;
+
+    let token_ids = generate_text_loop(model, encoded, 50, context_size)?;
+
+    let decoded_text = token_ids_to_text(&token_ids, tokenizer)?;
+
+    let output = decoded_text.replace("Än", " ");
+    println!("{}", output);
+
+    model.train();
+    Ok(output)
 }
