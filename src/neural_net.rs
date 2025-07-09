@@ -55,6 +55,22 @@ impl FeedForward {
 
         params
     }
+
+    pub fn parameters_mut(&mut self) -> Vec<&mut Tensor> {
+        let mut params = Vec::new();
+
+        params.push(&mut self.layer1.weight);
+        if let Some(bias) = &mut self.layer1.bias {
+            params.push(bias);
+        }
+
+        params.push(&mut self.layer2.weight);
+        if let Some(bias) = &mut self.layer2.bias {
+            params.push(bias);
+        }
+
+        params
+    }
 }
 
 pub struct TransformerBlock {
@@ -104,6 +120,20 @@ impl TransformerBlock {
         params.push(&self.norm1.shift);
         params.push(&self.norm2.scale);
         params.push(&self.norm2.shift);
+        params
+    }
+
+    pub fn parameters_mut(&mut self) -> Vec<&mut Tensor> {
+        let mut params = Vec::new();
+
+        params.extend(self.attention.parameters_mut());
+
+        params.extend(self.ff.parameters_mut());
+
+        params.push(&mut self.norm1.scale);
+        params.push(&mut self.norm1.shift);
+        params.push(&mut self.norm2.scale);
+        params.push(&mut self.norm2.shift);
         params
     }
 

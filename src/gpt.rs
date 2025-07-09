@@ -8,7 +8,6 @@ use crate::{
     layers::{Dropout, Linear},
     neural_net::TransformerBlock,
     normalization::LayerNorm,
-    utils::parse_batch_and_seq,
 };
 
 #[derive(Debug, Clone)]
@@ -141,6 +140,27 @@ impl GPT {
 
         params.push(&self.out_head.weight);
         if let Some(bias) = &self.out_head.bias {
+            params.push(bias);
+        }
+
+        params
+    }
+
+    pub fn get_parameters_mut(&mut self) -> Vec<&mut Tensor> {
+        let mut params = Vec::new();
+
+        params.extend(self.tok_emb.parameters_mut());
+        params.extend(self.pos_emb.parameters_mut());
+
+        for block in &mut self.trf_blocks {
+            params.extend(block.parameters_mut());
+        }
+
+        params.push(&mut self.final_norm.scale);
+        params.push(&mut self.final_norm.shift);
+
+        params.push(&mut self.out_head.weight);
+        if let Some(bias) = &mut self.out_head.bias {
             params.push(bias);
         }
 

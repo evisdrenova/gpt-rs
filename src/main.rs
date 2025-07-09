@@ -131,7 +131,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // For training
     //model.train(); // Enables dropouts
     //For inference/evaluation
-    model.eval(); // Disables dropout (like your Python code)
+    model.eval(); // Disables dropout
     println!("⏱️  Model eval mode setup: {:?}", step_start.elapsed());
 
     // Step 6: Generate text
@@ -180,5 +180,3 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-
-// refine adamw optimizer and optimize block speed

@@ -216,6 +216,32 @@ impl MultiHeadAttention {
         params
     }
 
+    pub fn parameters_mut(&mut self) -> Vec<&mut Tensor> {
+        let mut params = Vec::new();
+
+        params.push(&mut self.w_query.weight);
+        if let Some(bias) = &mut self.w_query.bias {
+            params.push(bias);
+        }
+
+        params.push(&mut self.w_key.weight);
+        if let Some(bias) = &mut self.w_key.bias {
+            params.push(bias);
+        }
+
+        params.push(&mut self.w_value.weight);
+        if let Some(bias) = &mut self.w_value.bias {
+            params.push(bias);
+        }
+
+        params.push(&mut self.out_proj.weight);
+        if let Some(bias) = &mut self.out_proj.bias {
+            params.push(bias);
+        }
+
+        params
+    }
+
     pub fn parameter_count(&self) -> usize {
         self.parameters().iter().map(|p| p.elem_count()).sum()
     }

@@ -1,3 +1,4 @@
+use crate::optimizers::AdamWOptimizer;
 use std::{cmp::min_by, f32};
 
 use crate::{
@@ -213,7 +214,7 @@ pub fn train_model_simple(
     model: &mut GPT,
     train_loader: DataLoader,
     validation_loader: DataLoader,
-    optimizer: &mut Optimizer,
+    optimizer: &mut AdamWOptimizer,
     device: &Device,
     num_epochs: usize,
     eval_freq: usize,
@@ -230,15 +231,17 @@ pub fn train_model_simple(
     for e in 0..num_epochs {
         model.train();
 
-        for (batch_idx, batch_result) in train_loader.iter().enumerate() {
-            let (inputs, targets) = batch_result?;
+        for (_batch_idx, batch_result) in train_loader.iter().enumerate() {
+            let (inputs, targets) =
+                batch_result.map_err(|e| Error::Msg(format!("DataLoader error: {}", e)))?;
 
             optimizer.zero_grad();
             let loss = calc_loss_batch(&inputs, &targets, model, device)?;
-            loss.backward();
-            optimizer.step();
+            loss.backward()?;
+            let parameters = model.get_parameters_mut();
+            optimizer.step(parameters)?;
 
-            tokens_seen += inputs.numel();
+            tokens_seen += inputs.elem_count();
             global_step += 1;
 
             if global_step % eval_freq == 0 {
@@ -271,15 +274,15 @@ pub fn train_model_simple(
 /// prints training and validation loss after each model update
 pub fn evaluate_model(
     model: &mut GPT,
-    train_loader: DataLoader,
-    validation_loader: DataLoader,
+    train_loader: &DataLoader,
+    validation_loader: &DataLoader,
     device: &Device,
     eval_iter: usize,
 ) -> Result<(f32, f32), Error> {
     model.eval();
-    let train_loss = calc_loss_loader(train_loader, model, device, eval_iter)?;
+    let train_loss = calc_loss_loader(train_loader.clone(), model, device, eval_iter)?;
 
-    let validation_loss = calc_loss_loader(validation_loader, model, device, eval_iter)?;
+    let validation_loss = calc_loss_loader(validation_loader.clone(), model, device, eval_iter)?;
 
     model.train();
     Ok((train_loss, validation_loss))
@@ -300,7 +303,7 @@ pub fn generate_and_print_sample(
 
     let decoded_text = token_ids_to_text(&token_ids, tokenizer)?;
 
-    let output = decoded_text.replace("Än", " ");
+    let output = decoded_text.replace("\n", " ");
     println!("{}", output);
 
     model.train();

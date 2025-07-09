@@ -57,6 +57,7 @@ pub fn split_train_validation(
     Ok((train_data, validation_data))
 }
 
+#[derive(Clone)]
 pub struct GPTDataset {
     input_ids: Vec<Tensor>,
     target_ids: Vec<Tensor>,
@@ -113,6 +114,7 @@ impl GPTDataset {
     }
 }
 
+#[derive(Clone)]
 pub struct DataLoader {
     dataset: GPTDataset,
     batch_size: usize,

@@ -61,6 +61,10 @@ impl Embedding {
         vec![&self.weights]
     }
 
+    pub fn parameters_mut(&mut self) -> Vec<&mut Tensor> {
+        vec![&mut self.weights]
+    }
+
     pub fn parameter_count(&self) -> usize {
         self.weights.elem_count()
     }
