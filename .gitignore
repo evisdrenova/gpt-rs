@@ -1,5 +1,6 @@
 /target
 
-*.py
+
 *.txt
-/py-gpt/*
+/py-gpt/venv
+/py-gpt/__pycache__
