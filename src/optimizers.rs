@@ -41,70 +41,80 @@ impl AdamWOptimizer {
     pub fn step(&mut self, parameters: Vec<&mut Tensor>) -> Result<(), Error> {
         self.step_count += 1;
 
-        let bias_correction1 = 1.0 - self.beta1.powi(self.step_count as i32);
-        let bias_correction2 = 1.0 - self.beta2.powi(self.step_count as i32);
+        let bc1 = 1.0 - self.beta1.powi(self.step_count as i32);
+        let bc2 = 1.0 - self.beta2.powi(self.step_count as i32);
 
-        for (param_idx, param) in parameters.iter_mut().enumerate() {
-            // In Candle, gradients are accessed differently
-            // For now, create a mock gradient to implement the AdamW logic
-            let device = param.device();
+        for (idx, param) in parameters.iter_mut().enumerate() {
+            /* -----------------------------------------------------------
+             * 1.  Fetch gradient; skip this param if there is none
+             * -------------------------------------------------------- */
+            let Some(grad) = param.grad()? else { continue };
 
-            // Initialize states if not exists
-            if !self.momentum_states.contains_key(&param_idx) {
+            /* -----------------------------------------------------------
+             * 2.  Lazily initialise state tensors on first encounter
+             * --------------------------------------------------------- */
+            if !self.momentum_states.contains_key(&idx) {
                 let zeros = Tensor::zeros_like(param)?;
-                self.momentum_states.insert(param_idx, zeros.clone());
-                self.velocity_states.insert(param_idx, zeros);
+                self.momentum_states.insert(idx, zeros.clone());
+                self.velocity_states.insert(idx, zeros);
                 if self.amsgrad {
                     self.max_velocity_states
-                        .insert(param_idx, Tensor::zeros_like(param)?);
+                        .insert(idx, Tensor::zeros_like(param)?);
                 }
             }
 
-            let momentum = self.momentum_states.get(&param_idx).unwrap();
-            let velocity = self.velocity_states.get(&param_idx).unwrap();
+            // clones are cheap (Arc) – needed for immutable ops
+            let m_prev = self.momentum_states.get(&idx).unwrap().clone();
+            let v_prev = self.velocity_states.get(&idx).unwrap().clone();
 
-            // Update momentum: m = beta1 * m + (1 - beta1) * grad
-            let momentum_new = (momentum * self.beta1)? + (&grad * (1.0 - self.beta1))?;
+            /* -----------------------------------------------------------
+             * 3.  Update first & second moments
+             * --------------------------------------------------------- */
+            let m_t = (&m_prev * self.beta1)? + (&grad * (1.0 - self.beta1))?;
+            let g2 = grad.sqr()?;
+            let v_t = (&v_prev * self.beta2)? + (&g2 * (1.0 - self.beta2))?;
 
-            // Update velocity: v = beta2 * v + (1 - beta2) * grad^2
-            let grad_squared = grad.sqr()?;
-            let velocity_new = (velocity * self.beta2)? + (&grad_squared * (1.0 - self.beta2))?;
+            /* -----------------------------------------------------------
+             * 4.  Bias-corrected estimates
+             * --------------------------------------------------------- */
+            let m_hat = (&m_t / bc1)?;
+            let v_hat = (&v_t. / bc2)?;
 
-            // Bias correction
-            let m_hat = (&momentum_new / bias_correction1)?;
-            let v_hat = (&velocity_new / bias_correction2)?;
-
-            // For AMSGrad variant
-            let v_hat_corrected = if self.amsgrad {
-                let max_v = self.max_velocity_states.get(&param_idx).unwrap();
-                let v_hat_max = v_hat.maximum(max_v)?;
-                self.max_velocity_states
-                    .insert(param_idx, v_hat_max.clone());
-                v_hat_max
+            /* -----------------------------------------------------------
+             * 5.  AMSGrad (optional) – maintain running max of v_hat
+             * --------------------------------------------------------- */
+            let v_hat_corr = if self.amsgrad {
+                let v_max_prev = self.max_velocity_states.get(&idx).unwrap().clone();
+                let v_max = v_hat.maximum(&v_max_prev)?;
+                // store updated max
+                self.max_velocity_states.insert(idx, v_max.clone());
+                v_max
             } else {
                 v_hat
             };
 
-            // AdamW update
-            let mut updated_param = param.clone();
+            /* -----------------------------------------------------------
+             * 6.  Weight-decay term (decoupled, as in AdamW paper)
+             * --------------------------------------------------------- */
+            let mut param_t = if self.weight_decay != 0.0 {
+                (param * (1.0 - self.learning_rate * self.weight_decay))?
+            } else {
+                param.clone()
+            };
 
-            // Weight decay (applied directly to parameter)
-            if self.weight_decay > 0.0 {
-                let decay_factor = 1.0 - self.learning_rate * self.weight_decay;
-                updated_param = (&updated_param * decay_factor)?;
-            }
+            /* -----------------------------------------------------------
+             * 7.  Parameter update:  θ ← θ − α · m̂ / (√v̂ + ε)
+             * --------------------------------------------------------- */
+            let denom = (v_hat_corr.sqrt()? + self.epsilon)?;
+            let update = (&m_hat / denom)? * self.learning_rate;
+            param_t = (&param_t - update)?;
 
-            // Gradient update: param = param - lr * m_hat / (sqrt(v_hat) + eps)
-            let denominator = (v_hat_corrected.sqrt()? + self.epsilon)?;
-            let update_term = (&m_hat / &denominator)? * self.learning_rate;
-            updated_param = (updated_param - update_term)?;
-
-            // Update the parameter tensor by copying the new values
-            *param = updated_param;
-
-            // Update states
-            self.momentum_states.insert(param_idx, momentum_new);
-            self.velocity_states.insert(param_idx, velocity_new);
+            /* -----------------------------------------------------------
+             * 8.  Commit new parameter & moment states
+             * --------------------------------------------------------- */
+            *param = param_t; // in-place update
+            self.momentum_states.insert(idx, m_t);
+            self.velocity_states.insert(idx, v_t);
         }
 
         Ok(())
