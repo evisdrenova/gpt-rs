@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data import Dataset, DataLoader
 import tiktoken
-from attention import MultiHeadAttentionWrapper, SelfAttention
+from attention import MultiHeadAttention, SelfAttention
 # from model import GPTModel, generate_text_simple,create_dataloader_v1, calc_loss_loader,train_model_simple
 
 with open('../the-verdict.txt',"r", encoding="utf-8") as f:
@@ -62,8 +62,11 @@ context_length = batch.shape[1] # This is the number of tokens
 d_in, d_out = 3, 2
 
 
-mha = MultiHeadAttentionWrapper(d_in, d_out, context_length, 0.0, num_heads=2)
-context_vecs = mha(batch)
 
+torch.manual_seed(123)
+batch_size, context_length, d_in = batch.shape
+d_out = 2
+mha = MultiHeadAttention(d_in, d_out, context_length, 0.0, num_heads=2)
+context_vecs = mha(batch)
 print(context_vecs)
 print("context_vecs.shape:", context_vecs.shape)
