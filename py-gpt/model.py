@@ -6,7 +6,7 @@ class DummyGPTModel(torch.nn.Module):
         self.tok_emb = torch.nn.Embedding(cfg["vocab_size"], cfg["emb_dim"])
         self.pos_emb = torch.nn.Embedding(cfg["context_length"], cfg["emb_dim"])
         self.drop_emb = torch.nn.Dropout(cfg["drop_rate"])
-        self.trf_blocks = torch.nn.Sequential(*[DummyTransformerBlock(cfg) for _ in range (cfg["n_layers"])])
+        self.trf_blocks = torch.nn.Sequential(*[TransformerBlock(cfg) for _ in range (cfg["n_layers"])])
         self.final_norm = LayerNorm(cfg["emb_dim"])
         self.out_head = torch.nn.Linear(cfg["emb_dim"], cfg["vocab_size"], bias=False)
 
@@ -22,15 +22,6 @@ class DummyGPTModel(torch.nn.Module):
         return logits
     
 
-class DummyTransformerBlock(torch.nn.Module):
-    def __init__(self,cfg):
-        super().__init__()
-    
-    def forward(self,x):
-        return x
-    
-
-
 class LayerNorm(torch.nn.Module):
     def __init__(self, emb_dim):
           super().__init__()
@@ -44,4 +35,12 @@ class LayerNorm(torch.nn.Module):
         norm_x = (x-mean)/ torch.sqrt(var + self.eps)                 
         return self.scale + norm_x + self.shift
     
+    
+
+class TransformerBlock(torch.nn.Module):
+    def __init__(self,cfg):
+        super().__init__()
+    
+    def forward(self,x):
+        return x
     
