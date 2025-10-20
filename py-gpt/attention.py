@@ -62,7 +62,7 @@ class MultiHeadAttention(torch.nn.Module):
         keys = keys.transpose(1, 2)
         queries = queries.transpose(1, 2)
         values = values.transpose(1, 2)
-
+    
         attn_scores = queries @ keys.transpose(2, 3)
         mask_bool = self.mask.bool()[:num_tokens, :num_tokens]
 
@@ -76,6 +76,6 @@ class MultiHeadAttention(torch.nn.Module):
         context_vec = context_vec.contiguous().view(
         b, num_tokens, self.d_out
         )
-        
+
         context_vec = self.out_proj(context_vec)
         return context_vec
