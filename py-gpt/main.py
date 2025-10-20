@@ -1,7 +1,7 @@
 import torch
 import tiktoken
 from attention import MultiHeadAttention, SelfAttention
-from model import DummyGPTModel
+from model import DummyGPTModel, TransformerBlock
 # from model import GPTModel, generate_text_simple,create_dataloader_v1, calc_loss_loader,train_model_simple
 
 GPT_CONFIG_124M = {
@@ -38,3 +38,10 @@ model = DummyGPTModel(GPT_CONFIG_124M)
 logits = model(batch)
 print("Output shape:", logits.shape)
 print(logits)
+
+torch.manual_seed(123)
+x = torch.rand(2, 4, 768)
+block = TransformerBlock(GPT_CONFIG_124M)
+output = block(x)
+print("Input shape:", x.shape)
+print("Output shape:", output.shape)

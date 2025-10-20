@@ -1,6 +1,9 @@
 import torch 
+from attention import MultiHeadAttention
+from activations import GELU, FeedForward
 
-class DummyGPTModel(torch.nn.Module):
+
+class GPTModel(torch.nn.Module):
     def __init__(self, cfg):
         super().__init__()
         self.tok_emb = torch.nn.Embedding(cfg["vocab_size"], cfg["emb_dim"])
@@ -30,17 +33,33 @@ class LayerNorm(torch.nn.Module):
           self.shift = torch.nn.Parameter(torch.zeros(emb_dim))
 
     def forward(self, x):
-        mean = x.mean(dim=-1, keepDim=True)
-        var = x.var(dim=-1, keepDim=True, unbiased=False)
-        norm_x = (x-mean)/ torch.sqrt(var + self.eps)                 
-        return self.scale + norm_x + self.shift
+        mean = x.mean(dim=-1, keepdim=True)
+        var = x.var(dim=-1, keepdim=True, unbiased=False)
+        norm_x = (x - mean) / torch.sqrt(var + self.eps)
+        return self.scale * norm_x + self.shift
     
     
 
 class TransformerBlock(torch.nn.Module):
     def __init__(self,cfg):
         super().__init__()
+        self.att = MultiHeadAttention(d_in=cfg["emb_dim"],d_out=cfg["emb_dim"],context_length=cfg["context_length"],num_heads=cfg["n_heads"], dropout=cfg["drop_rate"], qkv_bias=cfg["qkv_bias"])
+        self.ff = FeedForward(cfg)
+        self.norm1 = LayerNorm(cfg["emb_dim"])
+        self.norm2 = LayerNorm(cfg["emb_dim"])
+        self.drop_shortcut = torch.nn.Dropout(cfg["drop_rate"])
     
     def forward(self,x):
+        shortcut = x
+        x = self.norm1(x)
+        x = self.att(x)
+        x = self.drop_shortcut(x)
+        x = x+ shortcut
+
+        shortcut = x
+        x = self.norm2(x)
+        x = self.ff(x)
+        x = self.drop_shortcut(x)
+        x = x + shortcut
         return x
     
