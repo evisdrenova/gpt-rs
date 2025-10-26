@@ -1,47 +1,34 @@
 import torch
+import torch.nn as nn
 import tiktoken
 from attention import MultiHeadAttention, SelfAttention
-from model import DummyGPTModel, TransformerBlock
-# from model import GPTModel, generate_text_simple,create_dataloader_v1, calc_loss_loader,train_model_simple
+from model import  GPTModel,LayerNorm, TransformerBlock
+from activations import GELU, FeedForward
+from generation import token_ids_to_text, text_to_token_ids, generate_text_simple
 
 GPT_CONFIG_124M = {
-"vocab_size": 50257, # Vocabulary size
-"context_length": 1024, # Context length
-"emb_dim": 768, # Embedding dimension
-"n_heads": 12, # Number of attention heads
-"n_layers": 12, # Number of layers
-"drop_rate": 0.1, # Dropout rate
-"qkv_bias": False # Query-Key-Value bias
+"vocab_size": 50257,
+"context_length": 256,
+"emb_dim": 768,
+"n_heads": 12,
+"n_layers": 12,
+"drop_rate": 0.1,
+"qkv_bias": False
 }
 
+torch.manual_seed(123)
+model = GPTModel(GPT_CONFIG_124M)
+model.eval()
 
-# with open('../the-verdict.txt',"r", encoding="utf-8") as f:
-#     raw_text = f.read()
 
-
-# tokenizer = tiktoken.get_encoding("gpt2")
-# enc_text = tokenizer.encode(raw_text)
-
+start_context = "Every effort moves you"
 tokenizer = tiktoken.get_encoding("gpt2")
-batch = []
-txt1 = "Every effort moves you"
-txt2 = "Every day holds a"
-
-batch.append(torch.tensor(tokenizer.encode(txt1)))
-batch.append(torch.tensor(tokenizer.encode(txt2)))
-batch = torch.stack(batch, dim=0)
-print(batch)
+token_ids = generate_text_simple(
+model=model,
+idx=text_to_token_ids(start_context, tokenizer),max_new_tokens=10, context_size=GPT_CONFIG_124M["context_length"]
+)
+print("Output text:\n", token_ids_to_text(token_ids, tokenizer))
 
 
-torch.manual_seed(123)
-model = DummyGPTModel(GPT_CONFIG_124M)
-logits = model(batch)
-print("Output shape:", logits.shape)
-print(logits)
-
-torch.manual_seed(123)
-x = torch.rand(2, 4, 768)
-block = TransformerBlock(GPT_CONFIG_124M)
-output = block(x)
-print("Input shape:", x.shape)
-print("Output shape:", output.shape)
+inputs = torch.tensor([[16833, 3626, 6100], # ["every effort moves",
+[40, 1107, 588]]) # "I really like"]
