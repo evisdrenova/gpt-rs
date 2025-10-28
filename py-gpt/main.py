@@ -4,7 +4,7 @@ import tiktoken
 from attention import MultiHeadAttention, SelfAttention
 from model import  GPTModel,LayerNorm, TransformerBlock
 from activations import GELU, FeedForward
-from generation import generate, token_ids_to_text, text_to_token_ids, generate_text_simple
+from generation import generate, token_ids_to_text, text_to_token_ids
 from dataset import create_dataloader_v1
 from loss import calc_loss_loader
 from train import train_model_simple
@@ -59,10 +59,10 @@ torch.manual_seed(123)
 model = GPTModel(GPT_CONFIG_124M)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)
-optimizer = torch.optim.AdamW(
-model.parameters(),
-lr=0.0004, weight_decay=0.1
-)
+# optimizer = torch.optim.AdamW(
+# model.parameters(),
+# lr=0.0004, weight_decay=0.1
+# )
 # num_epochs = 10
 # train_losses, val_losses, tokens_seen = train_model_simple(
 # model, train_loader, val_loader, optimizer, device,
@@ -72,12 +72,12 @@ lr=0.0004, weight_decay=0.1
 
 torch.manual_seed(123)
 token_ids = generate(
-model=model,
-idx=text_to_token_ids("Every effort moves you", tokenizer),
-max_new_tokens=15,
-context_size=GPT_CONFIG_124M["context_length"],
-top_k=25,
-temperature=1.4
+    model=model,
+    idx=text_to_token_ids("Every effort moves you", tokenizer),
+    max_new_tokens=15,
+    context_size=GPT_CONFIG_124M["context_length"],
+    top_k=25,
+    temperature=1.4
 )
 print("Output text:\n", token_ids_to_text(token_ids, tokenizer))
 
