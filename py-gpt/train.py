@@ -1,6 +1,6 @@
 import torch
 from loss import calc_loss_batch, calc_loss_loader
-from generation import token_ids_to_text,text_to_token_ids,generate_text_simple
+from generation import token_ids_to_text,text_to_token_ids,generate
 
 def train_model_simple(model, train_loader, val_loader, optimizer, device, num_epochs, eval_freq, eval_iter, start_context, tokenizer):
     train_losses, val_losses, track_tokens_seen = [], [], []
@@ -46,7 +46,7 @@ def generate_and_print_sample(model, tokenizer, device, start_context):
     context_size = model.pos_emb.weight.shape[0]
     encoded = text_to_token_ids(start_context, tokenizer).to(device)
     with torch.no_grad():
-        token_ids = generate_text_simple(model=model, idx=encoded,max_new_tokens=50, context_size=context_size)
+        token_ids = generate(model=model, idx=encoded,max_new_tokens=50, context_size=context_size)
     decoded_text = token_ids_to_text(token_ids, tokenizer)
     print(decoded_text.replace("\n", " "))
     model.train()
