@@ -5,12 +5,14 @@ from attention import MultiHeadAttention, SelfAttention
 from model import GPTModel, LayerNorm, TransformerBlock
 from activations import GELU, FeedForward
 from generation import generate, token_ids_to_text, text_to_token_ids
-from dataset import create_dataloader_v1
+from dataset import create_dataloader_v1, download_and_unzip_spam_data
 from loss import calc_loss_loader
 from train import train_model_simple
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from load_weights import load_weights_into_gpt
+from pathlib import Path
+import pandas as pd
 
 GPT_CONFIG_124M = {
     "vocab_size": 50257,
@@ -36,30 +38,42 @@ model_configs = {
     "gpt2-xl (1558M)": {"emb_dim": 1600, "n_layers": 48, "n_heads": 25},
 }
 
-model_name = "gpt2-small (124M)"
-NEW_CONFIG = GPT_CONFIG_124M.copy()
-NEW_CONFIG.update(model_configs[model_name])
-NEW_CONFIG.update({"qkv_bias": True})
+# model_name = "gpt2-small (124M)"
+# NEW_CONFIG = GPT_CONFIG_124M.copy()
+# NEW_CONFIG.update(model_configs[model_name])
+# NEW_CONFIG.update({"qkv_bias": True})
 
-gpt = GPTModel(NEW_CONFIG)
-gpt.eval()
+# gpt = GPTModel(NEW_CONFIG)
+# gpt.eval()
 
-load_weights_into_gpt(gpt, params)
-gpt.to("cpu")
+# load_weights_into_gpt(gpt, params)
+# gpt.to("cpu")
 
 
-tokenizer = tiktoken.get_encoding("gpt2")
+# tokenizer = tiktoken.get_encoding("gpt2")
 
-torch.manual_seed(123)
-token_ids = generate(
-    model=gpt,
-    idx=text_to_token_ids("Every effort moves you", tokenizer).to("cpu"),
-    max_new_tokens=25,
-    context_size=NEW_CONFIG["context_length"],
-    top_k=50,
-    temperature=1.5,
-)
-print("Output text:\n", token_ids_to_text(token_ids, tokenizer))
+# torch.manual_seed(123)
+# token_ids = generate(
+#     model=gpt,
+#     idx=text_to_token_ids("Every effort moves you", tokenizer).to("cpu"),
+#     max_new_tokens=25,
+#     context_size=NEW_CONFIG["context_length"],
+#     top_k=50,
+#     temperature=1.5,
+# )
+# print("Output text:\n", token_ids_to_text(token_ids, tokenizer))
+
+url = "https://archive.ics.uci.edu/static/public/228/sms+spam+collection.zip"
+zip_path = "sms_spam_collection.zip"
+extracted_path = "sms_spam_collection"
+data_file_path = Path(extracted_path) / "SMSSpamCollection.tsv"
+
+
+download_and_unzip_spam_data(url, zip_path, extracted_path, data_file_path)
+
+
+df = pd.read_csv(data_file_path, sep="\t", header=None, names=["Label", "Text"])
+df
 
 # file_path = "../the-verdict.txt"
 # with open(file_path, "r", encoding="utf-8") as file:
