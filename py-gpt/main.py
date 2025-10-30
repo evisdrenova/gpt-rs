@@ -5,7 +5,12 @@ from attention import MultiHeadAttention, SelfAttention
 from model import GPTModel, LayerNorm, TransformerBlock
 from activations import GELU, FeedForward
 from generation import generate, token_ids_to_text, text_to_token_ids
-from dataset import create_dataloader_v1, download_and_unzip_spam_data
+from dataset import (
+    create_balanced_dataset,
+    create_dataloader_v1,
+    download_and_unzip_spam_data,
+    random_split,
+)
 from loss import calc_loss_loader
 from train import train_model_simple
 import matplotlib.pyplot as plt
@@ -24,19 +29,19 @@ GPT_CONFIG_124M = {
     "qkv_bias": False,
 }
 
-from gpt_download import download_and_load_gpt2
+# from gpt_download import download_and_load_gpt2
 
-settings, params = download_and_load_gpt2(model_size="124M", models_dir="gpt2")
+# settings, params = download_and_load_gpt2(model_size="124M", models_dir="gpt2")
 
-print("Settings:", settings)
-print("Parameter dictionary keys:", params.keys())
+# print("Settings:", settings)
+# print("Parameter dictionary keys:", params.keys())
 
-model_configs = {
-    "gpt2-small (124M)": {"emb_dim": 768, "n_layers": 12, "n_heads": 12},
-    "gpt2-medium (355M)": {"emb_dim": 1024, "n_layers": 24, "n_heads": 16},
-    "gpt2-large (774M)": {"emb_dim": 1280, "n_layers": 36, "n_heads": 20},
-    "gpt2-xl (1558M)": {"emb_dim": 1600, "n_layers": 48, "n_heads": 25},
-}
+# model_configs = {
+#     "gpt2-small (124M)": {"emb_dim": 768, "n_layers": 12, "n_heads": 12},
+#     "gpt2-medium (355M)": {"emb_dim": 1024, "n_layers": 24, "n_heads": 16},
+#     "gpt2-large (774M)": {"emb_dim": 1280, "n_layers": 36, "n_heads": 20},
+#     "gpt2-xl (1558M)": {"emb_dim": 1600, "n_layers": 48, "n_heads": 25},
+# }
 
 # model_name = "gpt2-small (124M)"
 # NEW_CONFIG = GPT_CONFIG_124M.copy()
@@ -63,17 +68,28 @@ model_configs = {
 # )
 # print("Output text:\n", token_ids_to_text(token_ids, tokenizer))
 
-url = "https://archive.ics.uci.edu/static/public/228/sms+spam+collection.zip"
-zip_path = "sms_spam_collection.zip"
+# url = "https://archive.ics.uci.edu/static/public/228/sms+spam+collection.zip"
+# zip_path = "sms_spam_collection.zip"
 extracted_path = "sms_spam_collection"
 data_file_path = Path(extracted_path) / "SMSSpamCollection.tsv"
 
 
-download_and_unzip_spam_data(url, zip_path, extracted_path, data_file_path)
+# download_and_unzip_spam_data(url, zip_path, extracted_path, data_file_path)
 
 
 df = pd.read_csv(data_file_path, sep="\t", header=None, names=["Label", "Text"])
-df
+print(df["Label"].value_counts())
+
+
+balanced_df = create_balanced_dataset(df)
+print(balanced_df["Label"].value_counts())
+balanced_df["Label"] = balanced_df["Label"].map({"ham": 0, "spam": 1})
+
+train_df, validation_df, test_df = random_split(balanced_df, 0.7, 0.1)
+
+train_df.to_csv("train.csv", index=None)
+validation_df.to_csv("validation.csv", index=None)
+test_df.to_csv("test.csv", index=None)
 
 # file_path = "../the-verdict.txt"
 # with open(file_path, "r", encoding="utf-8") as file:

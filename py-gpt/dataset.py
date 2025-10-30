@@ -6,6 +6,8 @@ import zipfile
 import os
 from pathlib import Path
 
+import pandas as pd
+
 
 class GPTDatasetV1(Dataset):
     # stride is the number of positions the sliding window slides, since we're doign enxt token prediction, its just 1 usually
@@ -54,8 +56,6 @@ def create_dataloader_v1(
     return dataloader
 
 
-
-
 def download_and_unzip_spam_data(url, zip_path, extracted_path, data_file_path):
     if data_file_path.exists():
         print(f"{data_file_path} already exists. Skipping download " "and extraction.")
@@ -70,5 +70,22 @@ def download_and_unzip_spam_data(url, zip_path, extracted_path, data_file_path):
     original_file_path = Path(extracted_path) / "SMSSpamCollection"
     os.rename(original_file_path, data_file_path)
     print(f"File downloaded and saved as {data_file_path}")
+
+
+def create_balanced_dataset(df):
+    num_spam = df[df["Label"] == "spam"].shape[0]
+    ham_subset = df[df["Label"] == "ham"].sample(num_spam, random_state=123)
+    balanced_df = pd.concat([ham_subset, df[df["Label"] == "spam"]])
+    return balanced_df
+
+
+def random_split(df, train_frac, validation_frac):
+    df = df.sample(frac=1, random_state=123).reset_index(drop=True)
+    train_end = int(len(df) * train_frac)
+    validation_end = train_end + int(len(df) * validation_frac)
+    train_df = df[:train_end]
+    validation_df = df[train_end:validation_end]
+    test_df = df[validation_end:]
+    return train_df, validation_df, test_df
 
 
