@@ -6,6 +6,7 @@ from model import GPTModel, LayerNorm, TransformerBlock
 from activations import GELU, FeedForward
 from generation import generate, token_ids_to_text, text_to_token_ids
 from dataset import (
+    SpamDataSet,
     create_balanced_dataset,
     create_dataloader_v1,
     download_and_unzip_spam_data,
@@ -18,6 +19,7 @@ from matplotlib.ticker import MaxNLocator
 from load_weights import load_weights_into_gpt
 from pathlib import Path
 import pandas as pd
+from torch.utils.data import DataLoader
 
 GPT_CONFIG_124M = {
     "vocab_size": 50257,
@@ -55,7 +57,7 @@ GPT_CONFIG_124M = {
 # gpt.to("cpu")
 
 
-# tokenizer = tiktoken.get_encoding("gpt2")
+tokenizer = tiktoken.get_encoding("gpt2")
 
 # torch.manual_seed(123)
 # token_ids = generate(
@@ -70,26 +72,69 @@ GPT_CONFIG_124M = {
 
 # url = "https://archive.ics.uci.edu/static/public/228/sms+spam+collection.zip"
 # zip_path = "sms_spam_collection.zip"
-extracted_path = "sms_spam_collection"
-data_file_path = Path(extracted_path) / "SMSSpamCollection.tsv"
+# extracted_path = "sms_spam_collection"
+# data_file_path = Path(extracted_path) / "SMSSpamCollection.tsv"
 
 
 # download_and_unzip_spam_data(url, zip_path, extracted_path, data_file_path)
 
 
-df = pd.read_csv(data_file_path, sep="\t", header=None, names=["Label", "Text"])
-print(df["Label"].value_counts())
+# df = pd.read_csv(data_file_path, sep="\t", header=None, names=["Label", "Text"])
+# print(df["Label"].value_counts())
 
 
-balanced_df = create_balanced_dataset(df)
-print(balanced_df["Label"].value_counts())
-balanced_df["Label"] = balanced_df["Label"].map({"ham": 0, "spam": 1})
+# balanced_df = create_balanced_dataset(df)
+# print(balanced_df["Label"].value_counts())
+# balanced_df["Label"] = balanced_df["Label"].map({"ham": 0, "spam": 1})
 
-train_df, validation_df, test_df = random_split(balanced_df, 0.7, 0.1)
+# train_df, validation_df, test_df = random_split(balanced_df, 0.7, 0.1)
 
-train_df.to_csv("train.csv", index=None)
-validation_df.to_csv("validation.csv", index=None)
-test_df.to_csv("test.csv", index=None)
+# train_df.to_csv("train.csv", index=None)
+# validation_df.to_csv("validation.csv", index=None)
+# test_df.to_csv("test.csv", index=None)
+
+train_dataset = SpamDataSet(csv_file="train.csv", max_length=None, tokenizer=tokenizer)
+
+print(train_dataset.max_length)
+
+val_dataset = SpamDataSet(
+    csv_file="validation.csv", max_length=train_dataset.max_length, tokenizer=tokenizer
+)
+test_dataset = SpamDataSet(
+    csv_file="test.csv", max_length=train_dataset.max_length, tokenizer=tokenizer
+)
+
+num_workers = 0
+batch_size = 8
+torch.manual_seed(123)
+train_loader = DataLoader(
+    dataset=train_dataset,
+    batch_size=batch_size,
+    shuffle=True,
+    num_workers=num_workers,
+    drop_last=True,
+)
+val_loader = DataLoader(
+    dataset=val_dataset,
+    batch_size=batch_size,
+    num_workers=num_workers,
+    drop_last=False,
+)
+test_loader = DataLoader(
+    dataset=test_dataset,
+    batch_size=batch_size,
+    num_workers=num_workers,
+    drop_last=False,
+)
+
+for input_batch, target_batch in train_loader:
+    pass
+print("Input batch dimensions:", input_batch.shape)
+print("Label batch dimensions", target_batch.shape)
+
+print(f"{len(train_loader)} training batches")
+print(f"{len(val_loader)} validation batches")
+print(f"{len(test_loader)} test batches")
 
 # file_path = "../the-verdict.txt"
 # with open(file_path, "r", encoding="utf-8") as file:
